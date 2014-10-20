@@ -31,8 +31,9 @@ import org.camunda.bpm.engine.runtime.Incident;
  *
  * @author nico.rehwaldt
  * @author roman.smirnov
+ * @author Falko Menge
  */
-public class FailedJobIncidentHandler implements IncidentHandler {
+public class FailedJobIncidentHandler extends AbstractIncidentHandlerImpl implements IncidentHandler {
 
   public final static String INCIDENT_HANDLER_TYPE = "failedJob";
 
@@ -40,14 +41,17 @@ public class FailedJobIncidentHandler implements IncidentHandler {
     return INCIDENT_HANDLER_TYPE;
   }
 
-  public void handleIncident(String processDefinitionId, String activityId, String executionId, String jobId, String message) {
+  @Override
+  public Incident createIncident(String processDefinitionId, String activityId, String executionId, String jobId, String message) {
+    IncidentEntity newIncident;
     if(executionId != null) {
-      IncidentEntity newIncident = IncidentEntity.createAndInsertIncident(INCIDENT_HANDLER_TYPE, executionId, jobId, message);
+      newIncident = IncidentEntity.createAndInsertIncident(INCIDENT_HANDLER_TYPE, executionId, jobId, message);
       newIncident.createRecursiveIncidents();
 
     } else {
-      IncidentEntity.createAndInsertIncident(INCIDENT_HANDLER_TYPE, processDefinitionId, activityId, jobId, message);
+      newIncident = IncidentEntity.createAndInsertIncident(INCIDENT_HANDLER_TYPE, processDefinitionId, activityId, jobId, message);
     }
+    return newIncident;
   }
 
   public void resolveIncident(String processDefinitionId, String activityId, String executionId, String configuration) {
