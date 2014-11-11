@@ -68,6 +68,7 @@ import java.util.Queue;
 import org.camunda.bpm.engine.ProcessEngineException;
 import org.camunda.bpm.engine.delegate.CaseVariableListener;
 import org.camunda.bpm.engine.delegate.Expression;
+import org.camunda.bpm.engine.delegate.TaskListener;
 import org.camunda.bpm.engine.delegate.VariableListener;
 import org.camunda.bpm.engine.impl.cmmn.entity.runtime.CaseSentryPartEntity;
 import org.camunda.bpm.engine.impl.cmmn.model.CmmnActivity;
@@ -77,13 +78,16 @@ import org.camunda.bpm.engine.impl.cmmn.model.CmmnOnPartDeclaration;
 import org.camunda.bpm.engine.impl.cmmn.model.CmmnSentryDeclaration;
 import org.camunda.bpm.engine.impl.context.Context;
 import org.camunda.bpm.engine.impl.core.instance.CoreExecution;
-import org.camunda.bpm.engine.impl.core.variable.CorePersistentVariableScope;
-import org.camunda.bpm.engine.impl.core.variable.VariableEvent;
+import org.camunda.bpm.engine.impl.core.variable.event.VariableEvent;
+import org.camunda.bpm.engine.impl.core.variable.scope.AbstractVariableScope;
+import org.camunda.bpm.engine.impl.persistence.entity.TaskEntity;
 import org.camunda.bpm.engine.impl.pvm.PvmException;
 import org.camunda.bpm.engine.impl.pvm.PvmProcessDefinition;
 import org.camunda.bpm.engine.impl.pvm.runtime.PvmExecutionImpl;
+import org.camunda.bpm.engine.impl.task.TaskDecorator;
 import org.camunda.bpm.engine.impl.variable.listener.CaseVariableListenerInvocation;
 import org.camunda.bpm.engine.impl.variable.listener.DelegateCaseVariableInstanceImpl;
+import org.camunda.bpm.engine.task.Task;
 
 /**
  * @author Roman Smirnov
@@ -113,6 +117,8 @@ public abstract class CmmnExecution extends CoreExecution implements CmmnCaseIns
 
   protected Queue<VariableEvent> variableEventsQueue;
 
+  protected transient TaskEntity task;
+
   public CmmnExecution() {
   }
 
@@ -133,6 +139,34 @@ public abstract class CmmnExecution extends CoreExecution implements CmmnCaseIns
      }
    }
    return null;
+  }
+
+  // task /////////////////////////////////////////////////////////////////////
+
+  public TaskEntity getTask() {
+    return this.task;
+  }
+
+  public void setTask(Task task) {
+    this.task = (TaskEntity) task;
+  }
+
+  public TaskEntity createTask(TaskDecorator taskDecorator) {
+    TaskEntity task = TaskEntity.createAndInsert(this);
+
+    task.setCaseExecution(this);
+    setTask(task);
+
+    taskDecorator.decorate(task, this);
+
+    Context.getCommandContext()
+      .getHistoricTaskInstanceManager()
+      .createHistoricTask(task);
+
+    // All properties set, now firing 'create' event
+    task.fireEvent(TaskListener.EVENTNAME_CREATE);
+
+    return task;
   }
 
   // sub process instance ////////////////////////////////////////////////////
@@ -557,7 +591,12 @@ public abstract class CmmnExecution extends CoreExecution implements CmmnCaseIns
 
   // variables ////////////////////////////////////////////
 
-  public CorePersistentVariableScope getParentVariableScope() {
+  @Override
+  public String getVariableScopeKey() {
+    return "caseExecution";
+  }
+
+  public AbstractVariableScope getParentVariableScope() {
     return getParent();
   }
 
@@ -872,7 +911,7 @@ public abstract class CmmnExecution extends CoreExecution implements CmmnCaseIns
                   .getDelegateInterceptor()
                   .handleInvocation(invocation);
               } catch (Exception e) {
-                throw new ProcessEngineException("Variable listener invocation failed", e);
+                throw new ProcessEngineException("Variable listener invocation failed: "+e.getMessage(), e);
               }
             }
           }

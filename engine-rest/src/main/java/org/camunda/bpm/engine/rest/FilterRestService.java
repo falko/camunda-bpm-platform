@@ -26,21 +26,19 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
-import javax.ws.rs.ext.Providers;
 
 import org.camunda.bpm.engine.rest.dto.CountResultDto;
 import org.camunda.bpm.engine.rest.dto.ResourceOptionsDto;
 import org.camunda.bpm.engine.rest.dto.runtime.FilterDto;
 import org.camunda.bpm.engine.rest.sub.runtime.FilterResource;
 
-@Path(FilterRestService.PATH)
 @Produces(MediaType.APPLICATION_JSON)
 public interface FilterRestService {
 
   static final String PATH = "/filter";
 
   @Path("/{id}")
-  FilterResource getFilter(@Context Providers providers, @PathParam("id") String filterId);
+  FilterResource getFilter(@PathParam("id") String filterId);
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)

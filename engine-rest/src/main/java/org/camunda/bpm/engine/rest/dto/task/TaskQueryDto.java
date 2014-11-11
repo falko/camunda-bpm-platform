@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response.Status;
 
@@ -37,6 +38,7 @@ import org.camunda.bpm.engine.rest.dto.converter.VariableListConverter;
 import org.camunda.bpm.engine.rest.exception.InvalidRequestException;
 import org.camunda.bpm.engine.task.DelegationState;
 import org.camunda.bpm.engine.task.TaskQuery;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
@@ -53,6 +55,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
   private static final String SORT_BY_DESCRIPTION_VALUE = "description";
   private static final String SORT_BY_ID_VALUE = "id";
   private static final String SORT_BY_NAME_VALUE = "name";
+  private static final String SORT_BY_NAME_CASE_INSENSITIVE_VALUE = "nameCaseInsensitive";
   private static final String SORT_BY_PRIORITY_VALUE = "priority";
 
   private static final List<String> VALID_SORT_BY_VALUES;
@@ -69,6 +72,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
     VALID_SORT_BY_VALUES.add(SORT_BY_DESCRIPTION_VALUE);
     VALID_SORT_BY_VALUES.add(SORT_BY_ID_VALUE);
     VALID_SORT_BY_VALUES.add(SORT_BY_NAME_VALUE);
+    VALID_SORT_BY_VALUES.add(SORT_BY_NAME_CASE_INSENSITIVE_VALUE);
     VALID_SORT_BY_VALUES.add(SORT_BY_PRIORITY_VALUE);
   }
 
@@ -149,8 +153,8 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
 
   }
 
-  public TaskQueryDto(MultivaluedMap<String, String> queryParameters) {
-    super(queryParameters);
+  public TaskQueryDto(ObjectMapper objectMapper, MultivaluedMap<String, String> queryParameters) {
+    super(objectMapper, queryParameters);
   }
 
   @CamundaQueryParam("processInstanceBusinessKey")
@@ -367,7 +371,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
   public void setFollowUpBeforeExpressionOrNotExistent(String followUpBeforeExpression) {
     this.followUpBeforeExpressionOrNotExistent = followUpBeforeExpression;
   }
-  
+
   @CamundaQueryParam(value = "followUpBeforeOrNotExistent", converter = DateConverter.class)
   public void setFollowUpBeforeOrNotExistent(Date followUpBefore) {
     this.followUpBeforeOrNotExistent = followUpBefore;
@@ -376,7 +380,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
   @CamundaQueryParam(value = "followUpBeforeExpression")
   public void setFollowUpBeforeExpression(String followUpBeforeExpression) {
     this.followUpBeforeExpression = followUpBeforeExpression;
-  }  
+  }
 
   @CamundaQueryParam(value = "followUp", converter = DateConverter.class)
   public void setFollowUpDate(Date followUp) {
@@ -967,7 +971,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
       for (VariableQueryParameterDto variableQueryParam : taskVariables) {
         String variableName = variableQueryParam.getName();
         String op = variableQueryParam.getOperator();
-        Object variableValue = variableQueryParam.getValue();
+        Object variableValue = variableQueryParam.resolveValue(objectMapper);
 
         if (op.equals(VariableQueryParameterDto.EQUALS_OPERATOR_NAME)) {
           query.taskVariableValueEquals(variableName, variableValue);
@@ -994,7 +998,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
       for (VariableQueryParameterDto variableQueryParam : processVariables) {
         String variableName = variableQueryParam.getName();
         String op = variableQueryParam.getOperator();
-        Object variableValue = variableQueryParam.getValue();
+        Object variableValue = variableQueryParam.resolveValue(objectMapper);
 
         if (op.equals(VariableQueryParameterDto.EQUALS_OPERATOR_NAME)) {
           query.processVariableValueEquals(variableName, variableValue);
@@ -1021,7 +1025,7 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
       for (VariableQueryParameterDto variableQueryParam : caseInstanceVariables) {
         String variableName = variableQueryParam.getName();
         String op = variableQueryParam.getOperator();
-        Object variableValue = variableQueryParam.getValue();
+        Object variableValue = variableQueryParam.resolveValue(objectMapper);
 
         if (op.equals(VariableQueryParameterDto.EQUALS_OPERATOR_NAME)) {
           query.caseInstanceVariableValueEquals(variableName, variableValue);
@@ -1070,6 +1074,8 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
         query.orderByTaskId();
       } else if (sortBy.equals(SORT_BY_NAME_VALUE)) {
         query.orderByTaskName();
+      } else if (sortBy.equals(SORT_BY_NAME_CASE_INSENSITIVE_VALUE)) {
+        query.orderByTaskNameCaseInsensitive();
       } else if (sortBy.equals(SORT_BY_PRIORITY_VALUE)) {
         query.orderByTaskPriority();
       }
@@ -1093,9 +1099,6 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
     dto.activityInstanceIdIn = taskQuery.getActivityInstanceIdIn();
     dto.assignee = taskQuery.getAssignee();
     dto.assigneeLike = taskQuery.getAssigneeLike();
-    dto.candidateGroup = taskQuery.getCandidateGroup();
-    dto.candidateGroups = taskQuery.getCandidateGroups();
-    dto.candidateUser = taskQuery.getCandidateUser();
     dto.caseDefinitionId = taskQuery.getCaseDefinitionId();
     dto.caseDefinitionKey = taskQuery.getCaseDefinitionKey();
     dto.caseDefinitionName = taskQuery.getCaseDefinitionName();
@@ -1104,6 +1107,15 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
     dto.caseInstanceBusinessKey = taskQuery.getCaseInstanceBusinessKey();
     dto.caseInstanceBusinessKeyLike = taskQuery.getCaseInstanceBusinessKeyLike();
     dto.caseInstanceId = taskQuery.getCaseInstanceId();
+
+    dto.candidateUser = taskQuery.getCandidateUser();
+    dto.candidateGroup = taskQuery.getCandidateGroup();
+    // only set candidate groups if no other candidate argument was set
+    // NOTE: the getCandidateGroups method does some magic which also
+    //       evaluates candidateUser and candidateGroup
+    if (dto.candidateUser == null && dto.candidateGroup == null) {
+      dto.candidateGroups = taskQuery.getCandidateGroups();
+    }
 
     dto.processInstanceBusinessKey = taskQuery.getProcessInstanceBusinessKey();
     dto.processInstanceBusinessKeyLike = taskQuery.getProcessInstanceBusinessKeyLike();
@@ -1116,8 +1128,6 @@ public class TaskQueryDto extends AbstractQueryDto<TaskQuery> {
     dto.processInstanceId = taskQuery.getProcessInstanceId();
     dto.assignee = taskQuery.getAssignee();
     dto.assigneeLike = taskQuery.getAssigneeLike();
-    dto.candidateGroup = taskQuery.getCandidateGroup();
-    dto.candidateUser = taskQuery.getCandidateUser();
     dto.taskDefinitionKey = taskQuery.getKey();
     dto.taskDefinitionKeyLike = taskQuery.getKeyLike();
     dto.description = taskQuery.getDescription();

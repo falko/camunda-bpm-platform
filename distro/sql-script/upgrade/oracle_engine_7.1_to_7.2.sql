@@ -74,6 +74,7 @@ create table ACT_RE_CASE_DEF (
     VERSION_ INTEGER NOT NULL,
     DEPLOYMENT_ID_ NVARCHAR2(64),
     RESOURCE_NAME_ NVARCHAR2(2000),
+    DGRM_RESOURCE_NAME_ NVARCHAR2(2000),
     primary key (ID_)
 );
 
@@ -174,16 +175,6 @@ alter table ACT_RU_CASE_SENTRY_PART
     foreign key (CASE_EXEC_ID_)
     references ACT_RU_CASE_EXECUTION(ID_);
 
--- add data format configuration fields
-ALTER TABLE ACT_RU_VARIABLE
-  ADD DATA_FORMAT_ID_ NVARCHAR2(64);
-
-ALTER TABLE ACT_HI_VARINST
-  ADD DATA_FORMAT_ID_ NVARCHAR2(64);
-
-ALTER TABLE ACT_HI_DETAIL
-  ADD DATA_FORMAT_ID_ NVARCHAR2(64);
-
 -- create filter table
 create table ACT_RU_FILTER (
   ID_ NVARCHAR2(64) not null,
@@ -191,15 +182,15 @@ create table ACT_RU_FILTER (
   RESOURCE_TYPE_ NVARCHAR2(255) not null,
   NAME_ NVARCHAR2(255) not null,
   OWNER_ NVARCHAR2(255),
-  QUERY_ CLOB not null,
-  PROPERTIES_ CLOB,
+  QUERY_ NCLOB not null,
+  PROPERTIES_ NCLOB,
   primary key (ID_)
 );
 
 -- add index to improve job executor performance
 create index ACT_IDX_JOB_PROCINST on ACT_RU_JOB(PROCESS_INSTANCE_ID_);
 
--- create historic case instance table and indexes --
+-- create historic case instance/activity table and indexes --
 create table ACT_HI_CASEINST (
     ID_ NVARCHAR2(64) not null,
     CASE_INST_ID_ NVARCHAR2(64) not null,
@@ -215,5 +206,44 @@ create table ACT_HI_CASEINST (
     unique (CASE_INST_ID_)
 );
 
+create table ACT_HI_CASEACTINST (
+    ID_ NVARCHAR2(64) not null,
+    PARENT_ACT_INST_ID_ NVARCHAR2(64),
+    CASE_DEF_ID_ NVARCHAR2(64) not null,
+    CASE_INST_ID_ NVARCHAR2(64) not null,
+    CASE_ACT_ID_ NVARCHAR2(255) not null,
+    TASK_ID_ NVARCHAR2(64),
+    CALL_PROC_INST_ID_ NVARCHAR2(64),
+    CALL_CASE_INST_ID_ NVARCHAR2(64),
+    CASE_ACT_NAME_ NVARCHAR2(255),
+    CREATE_TIME_ TIMESTAMP(6) not null,
+    END_TIME_ TIMESTAMP(6),
+    DURATION_ NUMBER(19,0),
+    STATE_ INTEGER,
+    primary key (ID_)
+);
+
 create index ACT_IDX_HI_CAS_I_CLOSE on ACT_HI_CASEINST(CLOSE_TIME_);
 create index ACT_IDX_HI_CAS_I_BUSKEY on ACT_HI_CASEINST(BUSINESS_KEY_);
+create index ACT_IDX_HI_CAS_A_I_CREATE on ACT_HI_CASEACTINST(CREATE_TIME_);
+create index ACT_IDX_HI_CAS_A_I_END on ACT_HI_CASEACTINST(END_TIME_);
+create index ACT_IDX_HI_CAS_A_I_COMP on ACT_HI_CASEACTINST(CASE_ACT_ID_, END_TIME_, ID_);
+
+create index ACT_IDX_TASK_ASSIGNEE on ACT_RU_TASK(ASSIGNEE_);
+
+-- add case instance/execution to historic variable instance and detail --
+alter table ACT_HI_VARINST
+  add CASE_INST_ID_ nvarchar2(64);
+
+alter table ACT_HI_VARINST
+  add CASE_EXECUTION_ID_ nvarchar2(64);
+
+alter table ACT_HI_DETAIL
+  add CASE_INST_ID_ nvarchar2(64);
+
+alter table ACT_HI_DETAIL
+  add CASE_EXECUTION_ID_ nvarchar2(64);
+
+create index ACT_IDX_HI_DETAIL_CASE_INST on ACT_HI_DETAIL(CASE_INST_ID_);
+create index ACT_IDX_HI_DETAIL_CASE_EXEC on ACT_HI_DETAIL(CASE_EXECUTION_ID_);
+create index ACT_IDX_HI_CASEVAR_CASE_INST on ACT_HI_VARINST(CASE_INST_ID_);

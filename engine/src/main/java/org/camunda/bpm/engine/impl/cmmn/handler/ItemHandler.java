@@ -17,11 +17,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
+import org.camunda.bpm.engine.ProcessEngineException;
 import org.camunda.bpm.engine.delegate.CaseExecutionListener;
 import org.camunda.bpm.engine.delegate.CaseVariableListener;
 import org.camunda.bpm.engine.delegate.Expression;
 import org.camunda.bpm.engine.delegate.VariableListener;
 import org.camunda.bpm.engine.impl.bpmn.parser.FieldDeclaration;
+import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.cmmn.CaseControlRule;
 import org.camunda.bpm.engine.impl.cmmn.behavior.CaseControlRuleImpl;
 import org.camunda.bpm.engine.impl.cmmn.behavior.CmmnActivityBehavior;
@@ -35,13 +37,9 @@ import org.camunda.bpm.engine.impl.cmmn.model.CmmnSentryDeclaration;
 import org.camunda.bpm.engine.impl.context.Context;
 import org.camunda.bpm.engine.impl.el.ExpressionManager;
 import org.camunda.bpm.engine.impl.el.FixedValue;
-import org.camunda.bpm.engine.impl.persistence.entity.DeploymentEntity;
-import org.camunda.bpm.engine.impl.scripting.DynamicResourceExecutableScript;
-import org.camunda.bpm.engine.impl.scripting.DynamicSourceExecutableScript;
 import org.camunda.bpm.engine.impl.scripting.ExecutableScript;
-import org.camunda.bpm.engine.impl.scripting.engine.JuelScriptEngineFactory;
-import org.camunda.bpm.engine.impl.util.ResourceUtil;
-import org.camunda.bpm.engine.impl.util.StringUtil;
+import org.camunda.bpm.engine.impl.scripting.engine.ScriptingEngines;
+import org.camunda.bpm.engine.impl.util.ScriptUtil;
 import org.camunda.bpm.engine.impl.variable.listener.ClassDelegateCaseVariableListener;
 import org.camunda.bpm.engine.impl.variable.listener.DelegateExpressionCaseVariableListener;
 import org.camunda.bpm.engine.impl.variable.listener.ExpressionCaseVariableListener;
@@ -78,45 +76,83 @@ public abstract class ItemHandler extends CmmnElementHandler<CmmnElement, CmmnAc
   public static final String PROPERTY_IS_BLOCKING = "isBlocking";
   public static final String PROPERTY_DISCRETIONARY = "discretionary";
 
-  public static List<String> TASK_OR_STAGE_EVENTS = Arrays.asList(
-      CaseExecutionListener.CREATE,
+  public static List<String> TASK_OR_STAGE_CREATE_EVENTS = Arrays.asList(
+      CaseExecutionListener.CREATE
+    );
+
+  public static List<String> TASK_OR_STAGE_UPDATE_EVENTS = Arrays.asList(
       CaseExecutionListener.ENABLE,
       CaseExecutionListener.DISABLE,
       CaseExecutionListener.RE_ENABLE,
       CaseExecutionListener.START,
       CaseExecutionListener.MANUAL_START,
-      CaseExecutionListener.TERMINATE,
-      CaseExecutionListener.EXIT,
       CaseExecutionListener.SUSPEND,
       CaseExecutionListener.PARENT_SUSPEND,
       CaseExecutionListener.RESUME,
-      CaseExecutionListener.PARENT_RESUME,
+      CaseExecutionListener.PARENT_RESUME
+    );
+
+  public static List<String> TASK_OR_STAGE_END_EVENTS = Arrays.asList(
+      CaseExecutionListener.TERMINATE,
+      CaseExecutionListener.EXIT,
       CaseExecutionListener.COMPLETE
     );
 
-  public static List<String> EVENTLISTENER_OR_MILESTONE_EVENTS = Arrays.asList(
-      CaseExecutionListener.CREATE,
+  public static List<String> TASK_OR_STAGE_EVENTS = new ArrayList<String>();
+
+  public static List<String> EVENT_LISTENER_OR_MILESTONE_CREATE_EVENTS = Arrays.asList(
+      CaseExecutionListener.CREATE
+    );
+
+  public static List<String> EVENT_LISTENER_OR_MILESTONE_UPDATE_EVENTS = Arrays.asList(
       CaseExecutionListener.SUSPEND,
-      CaseExecutionListener.RESUME,
+      CaseExecutionListener.RESUME
+    );
+
+  public static List<String> EVENT_LISTENER_OR_MILESTONE_END_EVENTS = Arrays.asList(
       CaseExecutionListener.TERMINATE,
       CaseExecutionListener.PARENT_TERMINATE,
       CaseExecutionListener.OCCUR
     );
 
-  public static List<String> CASE_PLAN_MODEL_EVENTS = Arrays.asList(
-      CaseExecutionListener.CREATE,
+  public static List<String> EVENT_LISTENER_OR_MILESTONE_EVENTS = new ArrayList<String>();
+
+  public static List<String> CASE_PLAN_MODEL_CREATE_EVENTS = Arrays.asList(
+      CaseExecutionListener.CREATE
+    );
+
+  public static List<String> CASE_PLAN_MODEL_UPDATE_EVENTS = Arrays.asList(
       CaseExecutionListener.TERMINATE,
       CaseExecutionListener.SUSPEND,
       CaseExecutionListener.COMPLETE,
-      CaseExecutionListener.RE_ACTIVATE,
+      CaseExecutionListener.RE_ACTIVATE
+    );
+
+  public static List<String> CASE_PLAN_MODEL_CLOSE_EVENTS = Arrays.asList(
       CaseExecutionListener.CLOSE
     );
+
+  public static List<String> CASE_PLAN_MODEL_EVENTS = new ArrayList<String>();
 
   public static List<String> DEFAULT_VARIABLE_EVENTS = Arrays.asList(
       VariableListener.CREATE,
       VariableListener.DELETE,
       VariableListener.UPDATE
   );
+
+  static {
+    TASK_OR_STAGE_EVENTS.addAll(TASK_OR_STAGE_CREATE_EVENTS);
+    TASK_OR_STAGE_EVENTS.addAll(TASK_OR_STAGE_UPDATE_EVENTS);
+    TASK_OR_STAGE_EVENTS.addAll(TASK_OR_STAGE_END_EVENTS);
+
+    EVENT_LISTENER_OR_MILESTONE_EVENTS.addAll(EVENT_LISTENER_OR_MILESTONE_CREATE_EVENTS);
+    EVENT_LISTENER_OR_MILESTONE_EVENTS.addAll(EVENT_LISTENER_OR_MILESTONE_UPDATE_EVENTS);
+    EVENT_LISTENER_OR_MILESTONE_EVENTS.addAll(EVENT_LISTENER_OR_MILESTONE_END_EVENTS);
+
+    CASE_PLAN_MODEL_EVENTS.addAll(CASE_PLAN_MODEL_CREATE_EVENTS);
+    CASE_PLAN_MODEL_EVENTS.addAll(CASE_PLAN_MODEL_UPDATE_EVENTS);
+    CASE_PLAN_MODEL_EVENTS.addAll(CASE_PLAN_MODEL_CLOSE_EVENTS);
+  }
 
   protected CmmnActivity createActivity(CmmnElement element, CmmnHandlerContext context) {
     String id = element.getId();
@@ -378,49 +414,17 @@ public abstract class ItemHandler extends CmmnElementHandler<CmmnElement, CmmnAc
     String resource = script.getCamundaResource();
     String source = script.getTextContent();
 
-    return initializeScriptDefinition(language, resource, source, context);
-  }
+    if (language == null) {
+      language = ScriptingEngines.DEFAULT_SCRIPTING_LANGUAGE;
+    }
 
-  public ExecutableScript initializeScriptDefinition(String language, String resource, String source, CmmnHandlerContext context) {
-    if (language != null) {
-      if (resource != null && !resource.isEmpty()) {
-        return parseScriptResource(resource, language, context);
-      }
-      else if(source != null) {
-        return parseScriptSource(source, language, context);
-      }
+    try {
+      return ScriptUtil.getScript(language, source, resource, context.getExpressionManager());
     }
-    return null;
-  }
-
-  protected ExecutableScript parseScriptSource(String source, String language, CmmnHandlerContext context) {
-    if (StringUtil.isExpression(source) && !JuelScriptEngineFactory.names.contains(language)) {
-      ExpressionManager expressionManager = context.getExpressionManager();
-      Expression scriptExpression = expressionManager.createExpression(source.trim());
-      return new DynamicSourceExecutableScript(scriptExpression, language);
+    catch (ProcessEngineException e) {
+      // ignore
+      return null;
     }
-    else {
-      return parseScript(source, language);
-    }
-  }
-
-  protected ExecutableScript parseScriptResource(String resource, String language, CmmnHandlerContext context) {
-    if (StringUtil.isExpression(resource)) {
-      ExpressionManager expressionManager = context.getExpressionManager();
-      Expression scriptResourceExpression = expressionManager.createExpression(resource);
-      return new DynamicResourceExecutableScript(scriptResourceExpression, language);
-    }
-    else {
-      DeploymentEntity deployment = (DeploymentEntity) context.getDeployment();
-      String scriptSource = ResourceUtil.loadResourceContent(resource, deployment);
-      return parseScript(scriptSource, language);
-    }
-  }
-
-  protected ExecutableScript parseScript(String script, String language) {
-    return Context.getProcessEngineConfiguration()
-      .getScriptFactory()
-      .createScript(script, language);
   }
 
   protected List<FieldDeclaration> initializeFieldDeclarations(CmmnElement element, CmmnActivity activity, CmmnHandlerContext context, Collection<CamundaField> fields) {

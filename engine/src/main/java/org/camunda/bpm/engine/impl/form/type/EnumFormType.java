@@ -16,12 +16,14 @@ package org.camunda.bpm.engine.impl.form.type;
 import java.util.Map;
 
 import org.camunda.bpm.engine.ProcessEngineException;
+import org.camunda.bpm.engine.variable.Variables;
+import org.camunda.bpm.engine.variable.value.TypedValue;
 
 
 /**
  * @author Tom Baeyens
  */
-public class EnumFormType extends AbstractFormFieldType {
+public class EnumFormType extends SimpleFormFieldType {
 
   public final static String TYPE_NAME = "enum";
 
@@ -43,6 +45,31 @@ public class EnumFormType extends AbstractFormFieldType {
     return null;
   }
 
+  public TypedValue convertValue(TypedValue propertyValue) {
+    Object value = propertyValue.getValue();
+    if(value == null || String.class.isInstance(value)) {
+      validateValue(value);
+      return Variables.stringValue((String) value);
+    }
+    else {
+      throw new ProcessEngineException("Value '"+value+"' is not of type String.");
+    }
+  }
+
+  protected void validateValue(Object value) {
+    if(value != null) {
+      if(values != null && !values.containsKey(value)) {
+        throw new ProcessEngineException("Invalid value for enum form property: " + value);
+      }
+    }
+  }
+
+  public Map<String, String> getValues() {
+    return values;
+  }
+
+  //////////////////// deprecated ////////////////////////////////////////
+
   @Override
   public Object convertFormValueToModelValue(Object propertyValue) {
     validateValue(propertyValue);
@@ -58,18 +85,6 @@ public class EnumFormType extends AbstractFormFieldType {
       validateValue(modelValue);
     }
     return (String) modelValue;
-  }
-
-  protected void validateValue(Object value) {
-    if(value != null) {
-      if(values != null && !values.containsKey(value)) {
-        throw new ProcessEngineException("Invalid value for enum form property: " + value);
-      }
-    }
-  }
-
-  public Map<String, String> getValues() {
-    return values;
   }
 
 }

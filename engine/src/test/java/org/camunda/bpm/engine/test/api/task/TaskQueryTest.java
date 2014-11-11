@@ -16,15 +16,16 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.ibatis.logging.LogFactory;
 import org.camunda.bpm.engine.BadUserRequestException;
 import org.camunda.bpm.engine.ProcessEngineException;
+import org.camunda.bpm.engine.filter.Filter;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.camunda.bpm.engine.impl.persistence.entity.TaskEntity;
 import org.camunda.bpm.engine.impl.persistence.entity.VariableInstanceEntity;
@@ -1174,6 +1175,56 @@ public class TaskQueryTest extends PluggableProcessEngineTestCase {
 
     assertEquals(6, taskService.createTaskQuery().orderByTaskId().taskName("testTask").asc().list().size());
     assertEquals(6, taskService.createTaskQuery().orderByTaskId().taskName("testTask").desc().list().size());
+  }
+
+  public void testQuerySortingByNameShouldBeCaseInsensitive() {
+    // create task with capitalized name
+    Task task = taskService.newTask("caseSensitiveTestTask");
+    task.setName("CaseSensitiveTestTask");
+    taskService.saveTask(task);
+
+    // create task filter
+    Filter filter = filterService.newTaskFilter("taskNameOrdering");
+    filterService.saveFilter(filter);
+
+    List<String> sortedNames = getTaskNamesFromTasks(taskService.createTaskQuery().list());
+    Collections.sort(sortedNames, String.CASE_INSENSITIVE_ORDER);
+
+    // ascending ordering
+    TaskQuery taskQuery = taskService.createTaskQuery().orderByTaskNameCaseInsensitive().asc();
+    List<String> ascNames = getTaskNamesFromTasks(taskQuery.list());
+    assertEquals(sortedNames, ascNames);
+
+    // test filter merging
+    ascNames = getTaskNamesFromTasks(filterService.list(filter.getId(), taskQuery));
+    assertEquals(sortedNames, ascNames);
+
+    // descending ordering
+
+    // reverse sorted names to test descending ordering
+    Collections.reverse(sortedNames);
+
+    taskQuery = taskService.createTaskQuery().orderByTaskNameCaseInsensitive().desc();
+    List<String> descNames = getTaskNamesFromTasks(taskQuery.list());
+    assertEquals(sortedNames, descNames);
+
+    // test filter merging
+    descNames = getTaskNamesFromTasks(filterService.list(filter.getId(), taskQuery));
+    assertEquals(sortedNames, descNames);
+
+    // delete test task
+    taskService.deleteTask(task.getId(), true);
+
+    // delete filter
+    filterService.deleteFilter(filter.getId());
+  }
+
+  public List<String> getTaskNamesFromTasks(List<Task> tasks) {
+    List<String> names = new ArrayList<String>();
+    for (Task task : tasks) {
+      names.add(task.getName());
+    }
+    return names;
   }
 
   public void testNativeQuery() {

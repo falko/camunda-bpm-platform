@@ -33,7 +33,6 @@ import org.camunda.bpm.engine.EntityTypes;
 import org.camunda.bpm.engine.authorization.Authorization;
 import org.camunda.bpm.engine.authorization.Permission;
 import org.camunda.bpm.engine.authorization.Permissions;
-import org.camunda.bpm.engine.delegate.ProcessEngineVariableType;
 import org.camunda.bpm.engine.exception.NotValidException;
 import org.camunda.bpm.engine.filter.Filter;
 import org.camunda.bpm.engine.filter.FilterQuery;
@@ -44,6 +43,8 @@ import org.camunda.bpm.engine.form.StartFormData;
 import org.camunda.bpm.engine.form.TaskFormData;
 import org.camunda.bpm.engine.history.HistoricActivityInstance;
 import org.camunda.bpm.engine.history.HistoricActivityStatistics;
+import org.camunda.bpm.engine.history.HistoricCaseActivityInstance;
+import org.camunda.bpm.engine.history.HistoricCaseInstance;
 import org.camunda.bpm.engine.history.HistoricDetail;
 import org.camunda.bpm.engine.history.HistoricFormField;
 import org.camunda.bpm.engine.history.HistoricIncident;
@@ -82,6 +83,10 @@ import org.camunda.bpm.engine.task.DelegationState;
 import org.camunda.bpm.engine.task.IdentityLink;
 import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
+import org.camunda.bpm.engine.variable.VariableMap;
+import org.camunda.bpm.engine.variable.Variables;
+import org.camunda.bpm.engine.variable.value.StringValue;
+import org.camunda.bpm.engine.variable.value.TypedValue;
 
 /**
  * Provides mocks for the basic engine entities, such as
@@ -163,11 +168,7 @@ public abstract class MockProvider {
 
   public static final String EXAMPLE_VARIABLE_INSTANCE_NAME = "aVariableInstanceName";
 
-  public static final String STRING_VARIABLE_INSTANCE_TYPE = ProcessEngineVariableType.STRING.getName();
-  public static final String SERIALIZABLE_VARIABLE_INSTANCE_TYPE = ProcessEngineVariableType.SERIALIZABLE.getName();
-  public static final String SPIN_VARIABLE_INSTANCE_TYPE = ProcessEngineVariableType.SPIN.getName();
-
-  public static final String EXAMPLE_VARIABLE_INSTANCE_VALUE = "aVariableInstanceValue";
+  public static final StringValue EXAMPLE_PRIMITIVE_VARIABLE_VALUE = Variables.stringValue("aVariableInstanceValue");
   public static final String EXAMPLE_VARIABLE_INSTANCE_PROC_INST_ID = "aVariableInstanceProcInstId";
   public static final String EXAMPLE_VARIABLE_INSTANCE_EXECUTION_ID = "aVariableInstanceExecutionId";
   public static final String EXAMPLE_VARIABLE_INSTANCE_CASE_INST_ID = "aVariableInstanceCaseInstId";
@@ -220,6 +221,8 @@ public abstract class MockProvider {
   public static final String EXAMPLE_DEPLOYMENT_NAME = "aName";
   public static final String EXAMPLE_DEPLOYMENT_NAME_LIKE = "aNameLike";
   public static final String EXAMPLE_DEPLOYMENT_TIME = "2013-01-23T13:59:43";
+  public static final String EXAMPLE_DEPLOYMENT_TIME_BEFORE = "2013-01-03T13:59:43";
+  public static final String EXAMPLE_DEPLOYMENT_TIME_AFTER = "2013-03-23T13:59:43";
   public static final String NON_EXISTING_DEPLOYMENT_TIME = "2013-04-23T13:42:43";
 
   // deployment resources
@@ -323,6 +326,24 @@ public abstract class MockProvider {
   public static final String EXAMPLE_HISTORIC_PROCESS_INSTANCE_FINISHED_AFTER = "2013-01-23T13:42:43";
   public static final String EXAMPLE_HISTORIC_PROCESS_INSTANCE_FINISHED_BEFORE = "2013-04-23T13:42:43";
 
+  // Historic Case Instance
+  public static final long EXAMPLE_HISTORIC_CASE_INSTANCE_DURATION_MILLIS = 2000l;
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CREATE_TIME = "2013-04-23T13:42:43";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CLOSE_TIME = "2013-04-23T13:42:43";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CREATE_USER_ID = "aCreateUserId";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_SUPER_CASE_INSTANCE_ID = "aSuperCaseInstanceId";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_SUB_CASE_INSTANCE_ID = "aSubCaseInstanceId";
+
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CREATED_AFTER = "2013-04-23T13:42:43";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CREATED_BEFORE = "2013-01-23T13:42:43";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CLOSED_AFTER = "2013-01-23T13:42:43";
+  public static final String EXAMPLE_HISTORIC_CASE_INSTANCE_CLOSED_BEFORE = "2013-04-23T13:42:43";
+
+  public static final boolean EXAMPLE_HISTORIC_CASE_INSTANCE_IS_ACTIVE = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_INSTANCE_IS_COMPLETED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_INSTANCE_IS_TERMINATED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_INSTANCE_IS_CLOSED = true;
+
   // Historic Activity Instance
   public static final String EXAMPLE_HISTORIC_ACTIVITY_INSTANCE_ID = "aHistoricActivityInstanceId";
   public static final String EXAMPLE_HISTORIC_ACTIVITY_INSTANCE_PARENT_ACTIVITY_INSTANCE_ID = "aHistoricParentActivityInstanceId";
@@ -337,11 +358,37 @@ public abstract class MockProvider {
   public static final boolean EXAMPLE_HISTORIC_ACTIVITY_INSTANCE_IS_CANCELED = true;
   public static final boolean EXAMPLE_HISTORIC_ACTIVITY_INSTANCE_IS_COMPLETE_SCOPE = true;
 
+  // Historic Case Activity Instance
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_ID = "aCaseActivityInstanceId";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_PARENT_CASE_ACTIVITY_INSTANCE_ID = "aParentCaseActivityId";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_ID = "aCaseActivityId";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_NAME = "aCaseActivityName";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CALLED_PROCESS_INSTANCE_ID = "aCalledProcessInstanceId";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CALLED_CASE_INSTANCE_ID = "aCalledCaseInstanceId";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CREATE_TIME = "2014-04-23T18:42:42";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_END_TIME = "2014-04-23T18:42:43";
+  public static final long EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_DURATION = 2000l;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_AVAILABLE = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_ENABLED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_DISABLED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_ACTIVE = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_FAILED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_SUSPENDED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_COMPLETED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_TERMINATED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_UNFINISHED = true;
+  public static final boolean EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_FINISHED = true;
+
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CREATED_AFTER = "2014-04-23T18:41:42";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CREATED_BEFORE = "2014-04-23T18:43:42";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_ENDED_AFTER = "2014-04-23T18:41:43";
+  public static final String EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_ENDED_BEFORE = "2014-04-23T18:43:43";
+
   // user operation log
   public static final String EXAMPLE_USER_OPERATION_LOG_ID = "userOpLogId";
   public static final String EXAMPLE_USER_OPERATION_ID = "opId";
   public static final String EXAMPLE_USER_OPERATION_TYPE = UserOperationLogEntry.OPERATION_TYPE_CLAIM;
-  public static final String EXAMPLE_USER_OPERATION_ENTITY = UserOperationLogEntry.ENTITY_TYPE_TASK;
+  public static final String EXAMPLE_USER_OPERATION_ENTITY = EntityTypes.TASK;
   public static final String EXAMPLE_USER_OPERATION_PROPERTY = "opProperty";
   public static final String EXAMPLE_USER_OPERATION_ORG_VALUE = "orgValue";
   public static final String EXAMPLE_USER_OPERATION_NEW_VALUE = "newValue";
@@ -357,7 +404,6 @@ public abstract class MockProvider {
   public static final String EXAMPLE_HISTORIC_VAR_UPDATE_NAME = "aVariableName";
   public static final String EXAMPLE_HISTORIC_VAR_UPDATE_TYPE_NAME = "String";
   public static final String EXAMPLE_HISTORIC_VAR_UPDATE_VALUE_TYPE_NAME = "String";
-  public static final String EXAMPLE_HISTORIC_VAR_UPDATE_VALUE = "aValue";
   public static final int EXAMPLE_HISTORIC_VAR_UPDATE_REVISION = 1;
   public static final String EXAMPLE_HISTORIC_VAR_UPDATE_ERROR = "anErrorMessage";
 
@@ -431,11 +477,14 @@ public abstract class MockProvider {
   public static final int EXAMPLE_CASE_DEFINITION_VERSION = 1;
   public static final String EXAMPLE_CASE_DEFINITION_CATEGORY = "aCaseDefinitionCategory";
   public static final String EXAMPLE_CASE_DEFINITION_NAME = "aCaseDefinitionName";
+  public static final String EXAMPLE_CASE_DEFINITION_NAME_LIKE = "aCaseDefinitionNameLike";
   public static final String EXAMPLE_CASE_DEFINITION_RESOURCE_NAME = "aCaseDefinitionResourceName";
+  public static final String EXAMPLE_CASE_DEFINITION_DIAGRAM_RESOURCE_NAME = "aResourceName.png";
 
   // case instance
   public static final String EXAMPLE_CASE_INSTANCE_ID = "aCaseInstId";
   public static final String EXAMPLE_CASE_INSTANCE_BUSINESS_KEY = "aBusinessKey";
+  public static final String EXAMPLE_CASE_INSTANCE_BUSINESS_KEY_LIKE = "aBusinessKeyLike";
   public static final String EXAMPLE_CASE_INSTANCE_CASE_DEFINITION_ID = "aCaseDefinitionId";
   public static final boolean EXAMPLE_CASE_INSTANCE_IS_ACTIVE = true;
   public static final boolean EXAMPLE_CASE_INSTANCE_IS_COMPLETED = true;
@@ -443,6 +492,7 @@ public abstract class MockProvider {
 
   // case execution
   public static final String EXAMPLE_CASE_EXECUTION_ID = "aCaseExecutionId";
+  public static final String ANOTHER_EXAMPLE_CASE_EXECUTION_ID = "anotherCaseExecutionId";
   public static final String EXAMPLE_CASE_EXECUTION_CASE_INSTANCE_ID = "aCaseInstanceId";
   public static final String EXAMPLE_CASE_EXECUTION_PARENT_ID = "aParentId";
   public static final String EXAMPLE_CASE_EXECUTION_CASE_DEFINITION_ID = "aCaseDefinitionId";
@@ -640,23 +690,18 @@ public abstract class MockProvider {
     return new MockVariableInstanceBuilder()
       .id(EXAMPLE_VARIABLE_INSTANCE_ID)
       .name(EXAMPLE_VARIABLE_INSTANCE_NAME)
-      .valueTypeName(STRING_VARIABLE_INSTANCE_TYPE)
-      .typeName(STRING_VARIABLE_INSTANCE_TYPE)
-      .value(EXAMPLE_VARIABLE_INSTANCE_VALUE)
+      .typedValue(EXAMPLE_PRIMITIVE_VARIABLE_VALUE)
       .processInstanceId(EXAMPLE_VARIABLE_INSTANCE_PROC_INST_ID)
       .executionId(EXAMPLE_VARIABLE_INSTANCE_EXECUTION_ID)
       .caseInstanceId(EXAMPLE_VARIABLE_INSTANCE_CASE_INST_ID)
       .caseExecutionId(EXAMPLE_VARIABLE_INSTANCE_CASE_EXECUTION_ID)
       .taskId(EXAMPLE_VARIABLE_INSTANCE_TASK_ID)
       .activityInstanceId(EXAMPLE_VARIABLE_INSTANCE_ACTIVITY_INSTANCE_ID)
-      .serializedValue(mockSerializedValue())
-      .errorMessage(null)
-      .storesCustomObjects(false);
+      .errorMessage(null);
   }
 
-  public static MockSerializedValueBuilder mockSerializedValue() {
-    return new MockSerializedValueBuilder()
-      .value(EXAMPLE_VARIABLE_INSTANCE_VALUE);
+  public static VariableInstance createMockVariableInstance(TypedValue value) {
+    return mockVariableInstance().typedValue(value).build();
   }
 
   public static Execution createMockExecution() {
@@ -1022,6 +1067,59 @@ public abstract class MockProvider {
     return mock;
   }
 
+  public static List<HistoricCaseActivityInstance> createMockHistoricCaseActivityInstances() {
+    ArrayList<HistoricCaseActivityInstance> mockList = new ArrayList<HistoricCaseActivityInstance>();
+    mockList.add(createMockHistoricCaseActivityInstance());
+    return mockList;
+  }
+
+  public static HistoricCaseActivityInstance createMockHistoricCaseActivityInstance() {
+    HistoricCaseActivityInstance mock = mock(HistoricCaseActivityInstance.class);
+
+    when(mock.getId()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_ID);
+    when(mock.getParentCaseActivityInstanceId()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_PARENT_CASE_ACTIVITY_INSTANCE_ID);
+    when(mock.getCaseActivityId()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_ID);
+    when(mock.getCaseActivityName()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_NAME);
+    when(mock.getCaseDefinitionId()).thenReturn(EXAMPLE_CASE_DEFINITION_ID);
+    when(mock.getCaseInstanceId()).thenReturn(EXAMPLE_CASE_INSTANCE_ID);
+    when(mock.getCaseExecutionId()).thenReturn(EXAMPLE_CASE_EXECUTION_ID);
+    when(mock.getTaskId()).thenReturn(EXAMPLE_TASK_ID);
+    when(mock.getCalledProcessInstanceId()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CALLED_PROCESS_INSTANCE_ID);
+    when(mock.getCalledCaseInstanceId()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CALLED_CASE_INSTANCE_ID);
+    when(mock.getCreateTime()).thenReturn(DateTimeUtil.parseDate(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_CREATE_TIME));
+    when(mock.getEndTime()).thenReturn(DateTimeUtil.parseDate(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_END_TIME));
+    when(mock.getDurationInMillis()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_DURATION);
+    when(mock.isAvailable()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_AVAILABLE);
+    when(mock.isEnabled()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_ENABLED);
+    when(mock.isDisabled()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_DISABLED);
+    when(mock.isActive()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_ACTIVE);
+    when(mock.isCompleted()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_COMPLETED);
+    when(mock.isTerminated()).thenReturn(EXAMPLE_HISTORIC_CASE_ACTIVITY_INSTANCE_IS_TERMINATED);
+
+    return mock;
+  }
+
+  public static List<HistoricCaseActivityInstance> createMockRunningHistoricCaseActivityInstances() {
+    List<HistoricCaseActivityInstance> mockList = new ArrayList<HistoricCaseActivityInstance>();
+    mockList.add(createMockRunningHistoricCaseActivityInstance());
+    return mockList;
+  }
+
+  public static HistoricCaseActivityInstance createMockRunningHistoricCaseActivityInstance() {
+    HistoricCaseActivityInstance mock = createMockHistoricCaseActivityInstance();
+
+    when(mock.getEndTime()).thenReturn(null);
+    when(mock.getDurationInMillis()).thenReturn(null);
+    when(mock.isAvailable()).thenReturn(false);
+    when(mock.isEnabled()).thenReturn(false);
+    when(mock.isDisabled()).thenReturn(false);
+    when(mock.isActive()).thenReturn(true);
+    when(mock.isCompleted()).thenReturn(false);
+    when(mock.isTerminated()).thenReturn(false);
+
+    return mock;
+  }
+
   public static List<HistoricActivityStatistics> createMockHistoricActivityStatistics() {
     HistoricActivityStatistics statistics = mock(HistoricActivityStatistics.class);
 
@@ -1088,6 +1186,50 @@ public abstract class MockProvider {
     return mock;
   }
 
+  public static List<HistoricCaseInstance> createMockHistoricCaseInstances() {
+    List<HistoricCaseInstance> mockList = new ArrayList<HistoricCaseInstance>();
+    mockList.add(createMockHistoricCaseInstance());
+    return mockList;
+  }
+
+  public static HistoricCaseInstance createMockHistoricCaseInstance() {
+    HistoricCaseInstance mock = mock(HistoricCaseInstance.class);
+
+    when(mock.getId()).thenReturn(EXAMPLE_CASE_INSTANCE_ID);
+    when(mock.getBusinessKey()).thenReturn(EXAMPLE_CASE_INSTANCE_BUSINESS_KEY);
+    when(mock.getCaseDefinitionId()).thenReturn(EXAMPLE_CASE_DEFINITION_ID);
+    when(mock.getCreateTime()).thenReturn(DateTimeUtil.parseDate(EXAMPLE_HISTORIC_CASE_INSTANCE_CREATE_TIME));
+    when(mock.getCloseTime()).thenReturn(DateTimeUtil.parseDate(EXAMPLE_HISTORIC_CASE_INSTANCE_CLOSE_TIME));
+    when(mock.getDurationInMillis()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_DURATION_MILLIS);
+    when(mock.getCreateUserId()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_CREATE_USER_ID);
+    when(mock.getSuperCaseInstanceId()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_SUPER_CASE_INSTANCE_ID);
+    when(mock.isActive()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_IS_ACTIVE);
+    when(mock.isCompleted()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_IS_COMPLETED);
+    when(mock.isTerminated()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_IS_TERMINATED);
+    when(mock.isClosed()).thenReturn(EXAMPLE_HISTORIC_CASE_INSTANCE_IS_CLOSED);
+
+    return mock;
+  }
+
+  public static List<HistoricCaseInstance> createMockRunningHistoricCaseInstances() {
+    List<HistoricCaseInstance> mockList = new ArrayList<HistoricCaseInstance>();
+    mockList.add(createMockHistoricCaseInstanceNotClosed());
+    return mockList;
+  }
+
+  public static HistoricCaseInstance createMockHistoricCaseInstanceNotClosed() {
+    HistoricCaseInstance mock = createMockHistoricCaseInstance();
+
+    when(mock.getCloseTime()).thenReturn(null);
+    when(mock.getDurationInMillis()).thenReturn(null);
+    when(mock.isActive()).thenReturn(true);
+    when(mock.isCompleted()).thenReturn(false);
+    when(mock.isTerminated()).thenReturn(false);
+    when(mock.isClosed()).thenReturn(false);
+
+    return mock;
+  }
+
   public static HistoricVariableInstance createMockHistoricVariableInstance() {
     return mockHistoricVariableInstance().build();
   }
@@ -1096,14 +1238,10 @@ public abstract class MockProvider {
     return new MockHistoricVariableInstanceBuilder()
         .id(EXAMPLE_VARIABLE_INSTANCE_ID)
         .name(EXAMPLE_VARIABLE_INSTANCE_NAME)
-        .value(EXAMPLE_VARIABLE_INSTANCE_VALUE)
-        .valueTypeName(STRING_VARIABLE_INSTANCE_TYPE)
-        .typeName(STRING_VARIABLE_INSTANCE_TYPE)
+        .typedValue(EXAMPLE_PRIMITIVE_VARIABLE_VALUE)
         .processInstanceId(EXAMPLE_VARIABLE_INSTANCE_PROC_INST_ID)
         .activityInstanceId(EXAMPLE_VARIABLE_INSTANCE_ACTIVITY_INSTANCE_ID)
-        .errorMessage(null)
-        .storesCustomObjects(false)
-        .serializedValue(mockSerializedValue());
+        .errorMessage(null);
   }
 
   public static List<ProcessInstance> createAnotherMockProcessInstanceList() {
@@ -1221,13 +1359,9 @@ public abstract class MockProvider {
         .taskId(EXAMPLE_HISTORIC_VAR_UPDATE_TASK_ID)
         .time(EXAMPLE_HISTORIC_VAR_UPDATE_TIME)
         .name(EXAMPLE_HISTORIC_VAR_UPDATE_NAME)
-        .typeName(EXAMPLE_HISTORIC_VAR_UPDATE_TYPE_NAME)
-        .valueTypeName(EXAMPLE_HISTORIC_VAR_UPDATE_VALUE_TYPE_NAME)
-        .storesCustomObjects(false)
-        .value(EXAMPLE_HISTORIC_VAR_UPDATE_VALUE)
+        .typedValue(EXAMPLE_PRIMITIVE_VARIABLE_VALUE)
         .revision(EXAMPLE_HISTORIC_VAR_UPDATE_REVISION)
-        .errorMessage(null)
-        .serializedValue(mockSerializedValue());
+        .errorMessage(null);
   }
 
 
@@ -1366,6 +1500,7 @@ public abstract class MockProvider {
         .key(EXAMPLE_CASE_DEFINITION_KEY)
         .version(EXAMPLE_CASE_DEFINITION_VERSION)
         .resource(EXAMPLE_CASE_DEFINITION_RESOURCE_NAME)
+        .diagram(EXAMPLE_CASE_DEFINITION_DIAGRAM_RESOURCE_NAME)
         .deploymentId(EXAMPLE_DEPLOYMENT_ID)
         .build();
 
@@ -1415,10 +1550,9 @@ public abstract class MockProvider {
     return mock;
   }
 
-  public static Map<String, VariableInstance> createMockFormVariables() {
-    Map<String, VariableInstance> mock = new HashMap<String, VariableInstance>();
-    VariableInstance variableInstanceMock = createMockVariableInstance();
-    mock.put(variableInstanceMock.getName(), variableInstanceMock);
+  public static VariableMap createMockFormVariables() {
+    VariableMap mock = Variables.createVariables();
+    mock.putValueTyped(EXAMPLE_VARIABLE_INSTANCE_NAME, EXAMPLE_PRIMITIVE_VARIABLE_VALUE);
     return mock;
   }
 

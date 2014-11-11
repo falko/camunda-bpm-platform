@@ -14,6 +14,7 @@
 package org.camunda.bpm.engine.test.api.runtime;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +23,6 @@ import java.util.Map;
 import org.camunda.bpm.engine.BadUserRequestException;
 import org.camunda.bpm.engine.ProcessEngineConfiguration;
 import org.camunda.bpm.engine.ProcessEngineException;
-import org.camunda.bpm.engine.delegate.ProcessEngineVariableType;
 import org.camunda.bpm.engine.history.HistoricActivityInstance;
 import org.camunda.bpm.engine.history.HistoricDetail;
 import org.camunda.bpm.engine.history.HistoricTaskInstance;
@@ -31,6 +31,7 @@ import org.camunda.bpm.engine.impl.history.HistoryLevel;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricDetailVariableInstanceUpdateEntity;
 import org.camunda.bpm.engine.impl.test.PluggableProcessEngineTestCase;
 import org.camunda.bpm.engine.impl.util.CollectionUtil;
+import org.camunda.bpm.engine.impl.variable.serializer.JavaObjectSerializer;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.runtime.ActivityInstance;
 import org.camunda.bpm.engine.runtime.Execution;
@@ -39,6 +40,9 @@ import org.camunda.bpm.engine.runtime.VariableInstance;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.test.Deployment;
 import org.camunda.bpm.engine.test.util.TestExecutionListener;
+import org.camunda.bpm.engine.variable.VariableMap;
+import org.camunda.bpm.engine.variable.Variables;
+import org.camunda.bpm.engine.variable.type.ValueType;
 
 
 /**
@@ -404,7 +408,7 @@ public class RuntimeServiceTest extends PluggableProcessEngineTestCase {
     runtimeService.signal(processInstance.getId(), null, null, processVariables);
 
     Map<String, Object> variables = runtimeService.getVariables(processInstance.getId());
-    assertEquals(variables, processVariables);
+    assertEquals(processVariables, variables);
 
   }
 
@@ -511,6 +515,93 @@ public class RuntimeServiceTest extends PluggableProcessEngineTestCase {
 
     assertEquals("value1", runtimeService.getVariable(processInstance.getId(), "variable1"));
     assertEquals("value2", runtimeService.getVariable(processInstance.getId(), "variable2"));
+  }
+
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesTyped() {
+    Map<String, Object> vars = new HashMap<String, Object>();
+    vars.put("variable1", "value1");
+    vars.put("variable2", "value2");
+
+    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("oneTaskProcess", vars);
+    VariableMap variablesTyped = runtimeService.getVariablesTyped(processInstance.getId());
+    assertEquals(vars, variablesTyped);
+  }
+
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesTypedDeserialize() {
+
+    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("oneTaskProcess",
+        Variables.createVariables()
+          .putValue("broken", Variables.serializedObjectValue("broken")
+              .serializationDataFormat(JavaObjectSerializer.SERIALIZATION_DATA_FORMAT)
+              .objectTypeName("unexisting").create()));
+
+    // this works
+    VariableMap variablesTyped = runtimeService.getVariablesTyped(processInstance.getId(), false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
+    variablesTyped = runtimeService.getVariablesTyped(processInstance.getId(), Arrays.asList("broken"), false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
+
+    // this does not
+    try {
+      runtimeService.getVariablesTyped(processInstance.getId());
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
+    }
+
+    // this does not
+    try {
+      runtimeService.getVariablesTyped(processInstance.getId(), Arrays.asList("broken"), true);
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
+    }
+  }
+
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesLocalTyped() {
+    Map<String, Object> vars = new HashMap<String, Object>();
+    vars.put("variable1", "value1");
+    vars.put("variable2", "value2");
+
+    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("oneTaskProcess", vars);
+    VariableMap variablesTyped = runtimeService.getVariablesLocalTyped(processInstance.getId());
+    assertEquals(vars, variablesTyped);
+  }
+
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesLocalTypedDeserialize() {
+
+    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("oneTaskProcess",
+        Variables.createVariables()
+          .putValue("broken", Variables.serializedObjectValue("broken")
+              .serializationDataFormat(JavaObjectSerializer.SERIALIZATION_DATA_FORMAT)
+              .objectTypeName("unexisting").create()));
+
+    // this works
+    VariableMap variablesTyped = runtimeService.getVariablesLocalTyped(processInstance.getId(), false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
+    variablesTyped = runtimeService.getVariablesLocalTyped(processInstance.getId(), Arrays.asList("broken"), false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
+
+    // this does not
+    try {
+      runtimeService.getVariablesLocalTyped(processInstance.getId());
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
+    }
+
+    // this does not
+    try {
+      runtimeService.getVariablesLocalTyped(processInstance.getId(), Arrays.asList("broken"), true);
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
+    }
+
   }
 
   @SuppressWarnings("unchecked")
@@ -1010,7 +1101,7 @@ public class RuntimeServiceTest extends PluggableProcessEngineTestCase {
     VariableInstance variableInstance = runtimeService.createVariableInstanceQuery().singleResult();
 
     assertEquals(47, variableInstance.getValue());
-    assertEquals(ProcessEngineVariableType.INTEGER.getName(), variableInstance.getTypeName());
+    assertEquals(ValueType.INTEGER.getName(), variableInstance.getTypeName());
   }
 
   @Deployment(resources = "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml")

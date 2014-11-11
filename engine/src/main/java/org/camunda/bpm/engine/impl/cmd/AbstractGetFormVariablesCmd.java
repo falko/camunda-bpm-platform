@@ -12,58 +12,42 @@
  */
 package org.camunda.bpm.engine.impl.cmd;
 
+import java.io.Serializable;
 import java.util.Collection;
-import java.util.Map;
 
-import org.camunda.bpm.engine.ProcessEngineException;
+import org.camunda.bpm.engine.delegate.VariableScope;
 import org.camunda.bpm.engine.form.FormField;
-import org.camunda.bpm.engine.impl.context.Context;
 import org.camunda.bpm.engine.impl.interceptor.Command;
-import org.camunda.bpm.engine.impl.persistence.entity.VariableInstanceEntity;
-import org.camunda.bpm.engine.impl.variable.VariableType;
-import org.camunda.bpm.engine.impl.variable.VariableTypes;
-import org.camunda.bpm.engine.runtime.VariableInstance;
+import org.camunda.bpm.engine.variable.VariableMap;
+import org.camunda.bpm.engine.variable.value.TypedValue;
 
 /**
  * @author  Daniel Meyer
  */
-public abstract class AbstractGetFormVariablesCmd implements Command<Map<String, VariableInstance>> {
+public abstract class AbstractGetFormVariablesCmd implements Command<VariableMap>, Serializable {
+
+  private static final long serialVersionUID = 1L;
 
   public String resourceId;
   public Collection<String> formVariableNames;
+  protected boolean deserializeObjectValues;
 
-  public AbstractGetFormVariablesCmd(String resourceId, Collection<String> formVariableNames) {
+  public AbstractGetFormVariablesCmd(String resourceId, Collection<String> formVariableNames, boolean deserializeObjectValues) {
     this.resourceId = resourceId;
     this.formVariableNames = formVariableNames;
+    this.deserializeObjectValues = deserializeObjectValues;
   }
 
-  /**
-   * Converts a FormField into a VariableInstance. Reads name, type information and default value.
-   *
-   */
-  protected VariableInstance createVariable(FormField formField) {
-    VariableInstanceEntity variableInstance = new VariableInstanceEntity();
+  protected TypedValue createVariable(FormField formField, VariableScope variableScope) {
+    TypedValue value = formField.getValue();
 
-    // name
-    variableInstance.setName(formField.getId());
-
-    // type
-    VariableTypes variableTypes = Context.getProcessEngineConfiguration()
-      .getVariableTypes();
-
-    VariableType variableType = variableTypes.getVariableType(formField.getTypeName());
-    if(variableType == null) {
-      throw new ProcessEngineException("Unsupported variable type '"+formField.getTypeName()+ "'.");
+    if(value != null) {
+      return value;
     }
-    variableInstance.setType(variableType);
-
-    // value
-    Object defaultValue = formField.getDefaultValue();
-    if(defaultValue != null) {
-      variableInstance.setValue(defaultValue);
+    else {
+      return null;
     }
 
-    return variableInstance;
   }
 
 }

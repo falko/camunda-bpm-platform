@@ -19,12 +19,12 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.camunda.bpm.engine.delegate.ProcessEngineVariableType;
 import org.camunda.bpm.engine.history.HistoricDetail;
 import org.camunda.bpm.engine.history.HistoricDetailQuery;
 import org.camunda.bpm.engine.impl.interceptor.CommandContext;
 import org.camunda.bpm.engine.impl.interceptor.CommandExecutor;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricDetailVariableInstanceUpdateEntity;
+import org.camunda.bpm.engine.variable.type.ValueType;
 
 
 /**
@@ -38,7 +38,9 @@ public class HistoricDetailQueryImpl extends AbstractQuery<HistoricDetailQuery, 
   protected String detailId;
   protected String taskId;
   protected String processInstanceId;
+  protected String caseInstanceId;
   protected String executionId;
+  protected String caseExecutionId;
   protected String activityId;
   protected String activityInstanceId;
   protected String type;
@@ -76,8 +78,20 @@ public class HistoricDetailQueryImpl extends AbstractQuery<HistoricDetailQuery, 
     return this;
   }
 
+  public HistoricDetailQuery caseInstanceId(String caseInstanceId) {
+    ensureNotNull("Case instance id", caseInstanceId);
+    this.caseInstanceId = caseInstanceId;
+    return this;
+  }
+
   public HistoricDetailQuery executionId(String executionId) {
     this.executionId = executionId;
+    return this;
+  }
+
+  public HistoricDetailQuery caseExecutionId(String caseExecutionId) {
+    ensureNotNull("Case execution id", caseExecutionId);
+    this.caseExecutionId = caseExecutionId;
     return this;
   }
 
@@ -142,14 +156,9 @@ public class HistoricDetailQueryImpl extends AbstractQuery<HistoricDetailQuery, 
       for (HistoricDetail historicDetail: historicDetails) {
         if (historicDetail instanceof HistoricDetailVariableInstanceUpdateEntity) {
           HistoricDetailVariableInstanceUpdateEntity entity = (HistoricDetailVariableInstanceUpdateEntity) historicDetail;
-          // do not fetch values for byte arrays eagerly (unless requested by the user)
-          if (shouldFetchSerializedValueFor(entity)) {
+          if (shouldFetchValue(entity)) {
             try {
-              entity.getSerializedValue();
-
-              if (shouldFetchValueFor(entity)) {
-                entity.getValue();
-              }
+              entity.getTypedValue(isCustomObjectDeserializationEnabled);
 
             } catch(Exception t) {
               // do not fail if one of the variables fails to load
@@ -163,25 +172,9 @@ public class HistoricDetailQueryImpl extends AbstractQuery<HistoricDetailQuery, 
     return historicDetails;
   }
 
-  /**
-   * eagerly fetch the variable's value unless the serialized value should not be fetched
-   * or custom object fetching is disabled
-   */
-  protected boolean shouldFetchValueFor(HistoricDetailVariableInstanceUpdateEntity variableInstance) {
-    boolean shouldFetchCustomObjects = !variableInstance.storesCustomObjects() || isCustomObjectDeserializationEnabled;
-
-    return shouldFetchSerializedValueFor(variableInstance) && shouldFetchCustomObjects;
-  }
-
-  /**
-   * Eagerly fetch the variable's serialized value unless the type is "bytes" and
-   * binary fetching disabled
-   */
-  protected boolean shouldFetchSerializedValueFor(HistoricDetailVariableInstanceUpdateEntity variableInstance) {
-    boolean shouldFetchBytes = !ProcessEngineVariableType.BYTES.getName().equals(variableInstance.getVariableType().getTypeName())
-        || isByteArrayFetchingEnabled;
-
-    return shouldFetchBytes;
+  protected boolean shouldFetchValue(HistoricDetailVariableInstanceUpdateEntity entity) {
+    // do not fetch values for byte arrays eagerly (unless requested by the user)
+    return isByteArrayFetchingEnabled || !ValueType.BYTES.equals(entity.getSerializer().getType());
   }
 
   // order by /////////////////////////////////////////////////////////////////
@@ -220,6 +213,18 @@ public class HistoricDetailQueryImpl extends AbstractQuery<HistoricDetailQuery, 
 
   public String getProcessInstanceId() {
     return processInstanceId;
+  }
+
+  public String getCaseInstanceId() {
+    return caseInstanceId;
+  }
+
+  public String getExecutionId() {
+    return executionId;
+  }
+
+  public String getCaseExecutionId() {
+    return caseExecutionId;
   }
 
   public String getTaskId() {

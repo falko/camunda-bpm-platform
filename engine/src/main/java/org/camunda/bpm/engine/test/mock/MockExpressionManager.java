@@ -25,10 +25,14 @@ import org.camunda.bpm.engine.impl.javax.el.MapELResolver;
 
 public class MockExpressionManager extends ExpressionManager {
 
+  protected ELResolver createElResolver(VariableScope scope) {
+    return createElResolver();
+  }
+
   @Override
-  protected ELResolver createElResolver(VariableScope<?> variableScope) {
+  protected ELResolver createElResolver() {
     CompositeELResolver compositeElResolver = new CompositeELResolver();
-    compositeElResolver.add(new VariableScopeElResolver(variableScope));
+    compositeElResolver.add(new VariableScopeElResolver());
     compositeElResolver.add(new MockElResolver());
     compositeElResolver.add(new ArrayELResolver());
     compositeElResolver.add(new ListELResolver());

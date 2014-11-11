@@ -18,6 +18,7 @@ import static org.camunda.bpm.engine.impl.util.EnsureUtil.ensureNotNull;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
@@ -44,9 +45,6 @@ import org.apache.ibatis.session.defaults.DefaultSqlSessionFactory;
 import org.apache.ibatis.transaction.TransactionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.apache.ibatis.transaction.managed.ManagedTransactionFactory;
-import org.apache.ibatis.type.JdbcType;
-import org.camunda.bpm.connect.rest.httpclient.RestHttpConnector;
-import org.camunda.bpm.connect.soap.httpclient.SoapHttpConnector;
 import org.camunda.bpm.engine.ArtifactFactory;
 import org.camunda.bpm.engine.AuthorizationService;
 import org.camunda.bpm.engine.CaseService;
@@ -61,7 +59,6 @@ import org.camunda.bpm.engine.ProcessEngineException;
 import org.camunda.bpm.engine.RepositoryService;
 import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.TaskService;
-import org.camunda.bpm.engine.delegate.ProcessEngineVariableType;
 import org.camunda.bpm.engine.impl.AuthorizationServiceImpl;
 import org.camunda.bpm.engine.impl.DefaultArtifactFactory;
 import org.camunda.bpm.engine.impl.FilterServiceImpl;
@@ -96,9 +93,7 @@ import org.camunda.bpm.engine.impl.cmmn.transformer.CmmnTransformFactory;
 import org.camunda.bpm.engine.impl.cmmn.transformer.CmmnTransformListener;
 import org.camunda.bpm.engine.impl.cmmn.transformer.CmmnTransformer;
 import org.camunda.bpm.engine.impl.cmmn.transformer.DefaultCmmnTransformFactory;
-import org.camunda.bpm.engine.impl.connector.Connectors;
 import org.camunda.bpm.engine.impl.db.DbIdGenerator;
-import org.camunda.bpm.engine.impl.db.IbatisVariableTypeHandler;
 import org.camunda.bpm.engine.impl.db.entitymanager.DbEntityManagerFactory;
 import org.camunda.bpm.engine.impl.db.entitymanager.cache.DbEntityCacheKeyMapping;
 import org.camunda.bpm.engine.impl.db.sql.DbSqlPersistenceProviderFactory;
@@ -179,6 +174,7 @@ import org.camunda.bpm.engine.impl.persistence.entity.EventSubscriptionManager;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionManager;
 import org.camunda.bpm.engine.impl.persistence.entity.FilterManager;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricActivityInstanceManager;
+import org.camunda.bpm.engine.impl.persistence.entity.HistoricCaseActivityInstanceManager;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricCaseInstanceManager;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricDetailManager;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricIncidentManager;
@@ -209,29 +205,28 @@ import org.camunda.bpm.engine.impl.scripting.engine.ScriptingEngines;
 import org.camunda.bpm.engine.impl.scripting.engine.VariableScopeResolverFactory;
 import org.camunda.bpm.engine.impl.scripting.env.ScriptEnvResolver;
 import org.camunda.bpm.engine.impl.scripting.env.ScriptingEnvironment;
-import org.camunda.bpm.engine.impl.spin.ProcessEngineSpinSupport;
 import org.camunda.bpm.engine.impl.util.IoUtil;
 import org.camunda.bpm.engine.impl.util.ReflectUtil;
-import org.camunda.bpm.engine.impl.variable.BooleanType;
-import org.camunda.bpm.engine.impl.variable.ByteArrayType;
-import org.camunda.bpm.engine.impl.variable.DateType;
-import org.camunda.bpm.engine.impl.variable.DefaultVariableTypes;
-import org.camunda.bpm.engine.impl.variable.DeserializedObjectsSessionFactory;
-import org.camunda.bpm.engine.impl.variable.DoubleType;
-import org.camunda.bpm.engine.impl.variable.EntityManagerSession;
-import org.camunda.bpm.engine.impl.variable.EntityManagerSessionFactory;
-import org.camunda.bpm.engine.impl.variable.IntegerType;
-import org.camunda.bpm.engine.impl.variable.JPAEntityVariableType;
-import org.camunda.bpm.engine.impl.variable.LongType;
-import org.camunda.bpm.engine.impl.variable.NullType;
-import org.camunda.bpm.engine.impl.variable.SerializableType;
-import org.camunda.bpm.engine.impl.variable.SerializableTypeResolver;
-import org.camunda.bpm.engine.impl.variable.SerializationVariableTypeResolver;
-import org.camunda.bpm.engine.impl.variable.ShortType;
-import org.camunda.bpm.engine.impl.variable.StringType;
-import org.camunda.bpm.engine.impl.variable.VariableType;
-import org.camunda.bpm.engine.impl.variable.VariableTypes;
+import org.camunda.bpm.engine.impl.variable.ValueTypeResolverImpl;
+import org.camunda.bpm.engine.impl.variable.serializer.BooleanValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.ByteArrayValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.DateValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.DefaultVariableSerializers;
+import org.camunda.bpm.engine.impl.variable.serializer.DeserializedObjectsSessionFactory;
+import org.camunda.bpm.engine.impl.variable.serializer.DoubleValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.IntegerValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.JavaObjectSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.LongValueSerlializer;
+import org.camunda.bpm.engine.impl.variable.serializer.NullValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.ShortValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.StringValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.TypedValueSerializer;
+import org.camunda.bpm.engine.impl.variable.serializer.VariableSerializers;
+import org.camunda.bpm.engine.impl.variable.serializer.jpa.EntityManagerSession;
+import org.camunda.bpm.engine.impl.variable.serializer.jpa.EntityManagerSessionFactory;
+import org.camunda.bpm.engine.impl.variable.serializer.jpa.JPAVariableSerializer;
 import org.camunda.bpm.engine.repository.DeploymentBuilder;
+import org.camunda.bpm.engine.variable.type.ValueType;
 
 
 /**
@@ -335,10 +330,12 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
   protected FormValidators formValidators;
   protected Map<String, Class<? extends FormFieldValidator>> customFormFieldValidators;
 
-  protected List<VariableType> customPreVariableTypes;
-  protected List<VariableType> customPostVariableTypes;
-  protected VariableTypes variableTypes;
-  protected String defaultSerializationFormat;
+  protected List<TypedValueSerializer> customPreVariableSerializers;
+  protected List<TypedValueSerializer> customPostVariableSerializers;
+  protected VariableSerializers variableSerializers;
+  protected String defaultSerializationFormat = JavaObjectSerializer.SERIALIZATION_DATA_FORMAT;
+  protected String defaultCharsetName = null;
+  protected Charset defaultCharset = null;
 
   protected ExpressionManager expressionManager;
   protected List<String> customScriptingEngineClasses;
@@ -439,10 +436,6 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
 
   protected boolean isInvokeCustomVariableListeners = true;
 
-  protected Connectors connectors;
-
-  protected List<SerializationVariableTypeResolver> serializationTypeResolvers = new ArrayList<SerializationVariableTypeResolver>();
-
   /**
    * The process engine created by this configuration.
    */
@@ -466,6 +459,7 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
 
   protected void init() {
     invokePreInit();
+    initDefaultCharset();
     initHistoryLevel();
     initHistoryEventProducer();
     initCmmnHistoryEventProducer();
@@ -490,9 +484,8 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     initSqlSessionFactory();
     initIdentityProviderSessionFactory();
     initSessionFactories();
-    initSpin();
-    initSerializationTypeResolvers();
-    initVariableTypes();
+    initValueTypeResolver();
+    initSerialization();
     initJpa();
     initDelegateInterceptor();
     initEventHandlers();
@@ -503,7 +496,6 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     initPasswordDigest();
     initDeploymentRegistration();
     initResourceAuthorizationProvider();
-    initConnectors();
 
     invokePostInit();
   }
@@ -814,7 +806,6 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
         XMLConfigBuilder parser = new XMLConfigBuilder(reader,"", properties);
         Configuration configuration = parser.getConfiguration();
         configuration.setEnvironment(environment);
-        configuration.getTypeHandlerRegistry().register(VariableType.class, JdbcType.VARCHAR, new IbatisVariableTypeHandler());
         configuration = parser.parse();
 
         sqlSessionFactory = new DefaultSqlSessionFactory(configuration);
@@ -852,6 +843,7 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
       addSessionFactory(new GenericManagerFactory(DeploymentManager.class));
       addSessionFactory(new GenericManagerFactory(ExecutionManager.class));
       addSessionFactory(new GenericManagerFactory(HistoricActivityInstanceManager.class));
+      addSessionFactory(new GenericManagerFactory(HistoricCaseActivityInstanceManager.class));
       addSessionFactory(new GenericManagerFactory(HistoricStatisticsManager.class));
       addSessionFactory(new GenericManagerFactory(HistoricDetailManager.class));
       addSessionFactory(new GenericManagerFactory(HistoricProcessInstanceManager.class));
@@ -1164,60 +1156,50 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     }
   }
 
-  protected void initSerializationTypeResolvers() {
-    serializationTypeResolvers.add(new SerializableTypeResolver());
+  protected void initValueTypeResolver() {
+    if(valueTypeResolver == null) {
+      valueTypeResolver = new ValueTypeResolverImpl();
+    }
   }
 
-  protected void initVariableTypes() {
-    if (variableTypes==null) {
-      variableTypes = new DefaultVariableTypes();
-      if (customPreVariableTypes!=null) {
-        for (VariableType customVariableType: customPreVariableTypes) {
-          variableTypes.addType(customVariableType);
-        }
+  protected void initDefaultCharset() {
+    if(defaultCharset == null) {
+      if(defaultCharsetName == null) {
+        defaultCharsetName = "UTF-8";
       }
-      variableTypes.addType(new NullType());
-      variableTypes.addType(new StringType());
-      variableTypes.addType(new BooleanType());
-      variableTypes.addType(new ShortType());
-      variableTypes.addType(new IntegerType());
-      variableTypes.addType(new LongType());
-      variableTypes.addType(new DateType());
-      variableTypes.addType(new DoubleType());
-      variableTypes.addType(new ByteArrayType());
+      defaultCharset = Charset.forName(defaultCharsetName);
+    }
 
-      if (defaultSerializationFormat != null) {
-        defaultSerializationFormat = defaultSerializationFormat.trim();
-        VariableType serializationType = null;
+  }
 
-        for (SerializationVariableTypeResolver resolver : serializationTypeResolvers) {
-          serializationType = resolver.getTypeForSerializationFormat(defaultSerializationFormat);
-          if (serializationType != null) {
-            break;
-          }
-        }
+  protected void initSerialization() {
+    if (variableSerializers==null) {
+      variableSerializers = new DefaultVariableSerializers();
 
-        if (serializationType != null) {
-          variableTypes.addType(serializationType);
-        } else {
-          throw new ProcessEngineException("Cannot find a VariableType that serializes objects"
-              + " for the default format '" + defaultSerializationFormat + "'");
-        }
-      } else {
-        variableTypes.addType(new SerializableType());
-        if(ProcessEngineSpinSupport.isSpinAvailable()) {
-          VariableType spinVariableType = ProcessEngineSpinSupport
-            .getVariableTypeResolver()
-            .getTypeForSerializationFormat("application/json; implementation=tree");
-          variableTypes.addType(spinVariableType);
+      if (customPreVariableSerializers!=null) {
+        for (TypedValueSerializer<?> customVariableType: customPreVariableSerializers) {
+          variableSerializers.addSerializer(customVariableType);
         }
       }
 
-      if (customPostVariableTypes!=null) {
-        for (VariableType customVariableType: customPostVariableTypes) {
-          variableTypes.addType(customVariableType);
+      // register built-in serializers
+      variableSerializers.addSerializer(new NullValueSerializer());
+      variableSerializers.addSerializer(new StringValueSerializer());
+      variableSerializers.addSerializer(new BooleanValueSerializer());
+      variableSerializers.addSerializer(new ShortValueSerializer());
+      variableSerializers.addSerializer(new IntegerValueSerializer());
+      variableSerializers.addSerializer(new LongValueSerlializer());
+      variableSerializers.addSerializer(new DateValueSerializer());
+      variableSerializers.addSerializer(new DoubleValueSerializer());
+      variableSerializers.addSerializer(new ByteArrayValueSerializer());
+      variableSerializers.addSerializer(new JavaObjectSerializer());
+
+      if (customPostVariableSerializers!=null) {
+        for (TypedValueSerializer<?> customVariableType: customPostVariableSerializers) {
+          variableSerializers.addSerializer(customVariableType);
         }
       }
+
     }
   }
 
@@ -1282,38 +1264,13 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
       scriptingEngines = new ScriptingEngines(new ScriptBindingsFactory(resolverFactories));
     }
     if(scriptFactory == null) {
-      scriptFactory = new ScriptFactory(scriptingEngines, enableScriptCompilation);
+      scriptFactory = new ScriptFactory();
     }
     if(scriptEnvResolvers == null) {
       scriptEnvResolvers = new ArrayList<ScriptEnvResolver>();
     }
     if(scriptingEnvironment == null) {
-      scriptingEnvironment = new ScriptingEnvironment(scriptFactory, scriptEnvResolvers);
-    }
-  }
-
-  protected void initSpin() {
-    if(ProcessEngineSpinSupport.isSpinAvailable()) {
-      log.info("Spin available: camunda Spin is found on the classpath. Spin support is available in Expression Language and Scripts.");
-      // add spin script env resolver
-      scriptEnvResolvers.add(ProcessEngineSpinSupport.getScriptEnvResolver());
-      // add spin el function mapper
-      expressionManager.addFunctionMapper(ProcessEngineSpinSupport.getElFunctionMapper());
-      // add spin variable type resolver
-      serializationTypeResolvers.add(ProcessEngineSpinSupport.getVariableTypeResolver());
-    } else {
-      log.info("Spin unavailable: camunda Spin is not found on the classpath.");
-
-    }
-  }
-
-  protected void initConnectors() {
-    if(connectors == null) {
-      connectors = new Connectors();
-
-      // register default connectors
-      connectors.addConnector(SoapHttpConnector.ID, SoapHttpConnector.class);
-      connectors.addConnector(RestHttpConnector.ID, RestHttpConnector.class);
+      scriptingEnvironment = new ScriptingEnvironment(scriptFactory, scriptEnvResolvers, scriptingEngines);
     }
   }
 
@@ -1373,15 +1330,15 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     }
     if(jpaEntityManagerFactory!=null) {
       sessionFactories.put(EntityManagerSession.class, new EntityManagerSessionFactory(jpaEntityManagerFactory, jpaHandleTransaction, jpaCloseEntityManager));
-      VariableType jpaType = variableTypes.getVariableType(ProcessEngineVariableType.JPA.getName());
+      JPAVariableSerializer jpaType = (JPAVariableSerializer) variableSerializers.getSerializerByName(JPAVariableSerializer.NAME);
       // Add JPA-type
       if(jpaType == null) {
-        // We try adding the variable right before SerializableType, if available
-        int serializableIndex = variableTypes.getTypeIndex(ProcessEngineVariableType.SERIALIZABLE.getName());
+        // We try adding the variable right after byte serializer, if available
+        int serializableIndex = variableSerializers.getSerializerIndexByName(ValueType.BYTES.getName());
         if(serializableIndex > -1) {
-          variableTypes.addType(new JPAEntityVariableType(), serializableIndex);
+          variableSerializers.addSerializer(new JPAVariableSerializer(), serializableIndex);
         } else {
-          variableTypes.addType(new JPAEntityVariableType());
+          variableSerializers.addSerializer(new JPAVariableSerializer());
         }
       }
     }
@@ -1702,12 +1659,12 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     return this;
   }
 
-  public VariableTypes getVariableTypes() {
-    return variableTypes;
+  public VariableSerializers getVariableSerializers() {
+    return variableSerializers;
   }
 
-  public ProcessEngineConfigurationImpl setVariableTypes(VariableTypes variableTypes) {
-    this.variableTypes = variableTypes;
+  public ProcessEngineConfigurationImpl setVariableTypes(VariableSerializers variableSerializers) {
+    this.variableSerializers = variableSerializers;
     return this;
   }
 
@@ -1858,24 +1815,24 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     return this;
   }
 
-  public List<VariableType> getCustomPreVariableTypes() {
-    return customPreVariableTypes;
+  public List<TypedValueSerializer> getCustomPreVariableSerializers() {
+    return customPreVariableSerializers;
   }
 
 
-  public ProcessEngineConfigurationImpl setCustomPreVariableTypes(List<VariableType> customPreVariableTypes) {
-    this.customPreVariableTypes = customPreVariableTypes;
+  public ProcessEngineConfigurationImpl setCustomPreVariableSerializers(List<TypedValueSerializer> customPreVariableTypes) {
+    this.customPreVariableSerializers = customPreVariableTypes;
     return this;
   }
 
 
-  public List<VariableType> getCustomPostVariableTypes() {
-    return customPostVariableTypes;
+  public List<TypedValueSerializer> getCustomPostVariableSerializers() {
+    return customPostVariableSerializers;
   }
 
 
-  public ProcessEngineConfigurationImpl setCustomPostVariableTypes(List<VariableType> customPostVariableTypes) {
-    this.customPostVariableTypes = customPostVariableTypes;
+  public ProcessEngineConfigurationImpl setCustomPostVariableSerializers(List<TypedValueSerializer> customPostVariableTypes) {
+    this.customPostVariableSerializers = customPostVariableTypes;
     return this;
   }
 
@@ -2471,14 +2428,6 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     this.scriptEnvResolvers = scriptEnvResolvers;
   }
 
-  public Connectors getConnectors() {
-    return connectors;
-  }
-
-  public void setConnectors(Connectors connectors) {
-    this.connectors = connectors;
-  }
-
   public ProcessEngineConfiguration setArtifactFactory(ArtifactFactory artifactFactory) {
     this.artifactFactory = artifactFactory;
     return this;
@@ -2497,13 +2446,18 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     return this;
   }
 
-  public List<SerializationVariableTypeResolver> getSerializationTypeResolvers() {
-    return serializationTypeResolvers;
+  public ProcessEngineConfigurationImpl setDefaultCharsetName(String defaultCharsetName) {
+    this.defaultCharsetName = defaultCharsetName;
+    return this;
   }
 
-  public ProcessEngineConfigurationImpl setSerializationTypeResolvers(List<SerializationVariableTypeResolver> serializationTypeResolvers) {
-    this.serializationTypeResolvers = serializationTypeResolvers;
+  public ProcessEngineConfigurationImpl setDefaultCharset(Charset defautlCharset) {
+    this.defaultCharset = defautlCharset;
     return this;
+  }
+
+  public Charset getDefaultCharset() {
+    return defaultCharset;
   }
 
   public boolean isDbEntityCacheReuseEnabled() {

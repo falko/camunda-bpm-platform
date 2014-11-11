@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import org.camunda.bpm.engine.exception.NotValidException;
 import org.camunda.bpm.engine.query.Query;
 
 /**
@@ -86,7 +87,7 @@ public interface HistoricCaseInstanceQuery extends Query<HistoricCaseInstanceQue
 
   /** Only select historic case instances having a sub case instance
    * with the given case instance id.
-   * 
+   *
    * Note that there will always be maximum only <b>one</b>
    * such case instance that can be the result of this query.
    */
@@ -101,17 +102,82 @@ public interface HistoricCaseInstanceQuery extends Query<HistoricCaseInstanceQue
   /** Only select historic case instances which are terminated */
   HistoricCaseInstanceQuery terminated();
 
-  /** Only select historic case instances which are failed */
-  HistoricCaseInstanceQuery failed();
-
-  /** Only select historic case instances which are suspended */
-  HistoricCaseInstanceQuery suspended();
-
   /** Only select historic case instances which are closed */
   HistoricCaseInstanceQuery closed();
 
   /** Only select historic case instance that are not yet closed. */
   HistoricCaseInstanceQuery notClosed();
+
+  /**
+   * Only select case instances which have a global variable with the given value.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable
+   * @throws NotValidException if the name is null
+   */
+  HistoricCaseInstanceQuery variableValueEquals(String name, Object value);
+
+  /**
+   * Only select case instances which have a global variable with the given name
+   * but a different value.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable
+   * @throws NotValidException if the name is null
+   */
+  HistoricCaseInstanceQuery variableValueNotEquals(String name, Object value);
+
+  /**
+   * Only select case instances which had a global variable with the given name
+   * and a value greater than the given value when they where closed.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable
+   * @throws NotValidException if the name or value is null
+   */
+  HistoricCaseInstanceQuery variableValueGreaterThan(String name, Object value);
+
+  /**
+   * Only select case instances which have a global variable with the given name
+   * and a value greater or equal than the given value.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable
+   * @throws NotValidException if the name or value is null
+   */
+  HistoricCaseInstanceQuery variableValueGreaterThanOrEqual(String name, Object value);
+
+  /**
+   * Only select case instances which have a global variable with the given name
+   * and a value less than the given value.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable
+   * @throws NotValidException if the name or value is null
+   */
+  HistoricCaseInstanceQuery variableValueLessThan(String name, Object value);
+
+  /**
+   * Only select case instances which have a global variable with the given name
+   * and a value less or equal than the given value.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable
+   * @throws NotValidException if the name or value is null
+   */
+  HistoricCaseInstanceQuery variableValueLessThanOrEqual(String name, Object value);
+
+  /**
+   * Only select case instances which have a global variable with the given name
+   * and a value like given value.
+   *
+   * @param name the name of the variable
+   * @param value the value of the variable, it can include the wildcard character '%'
+   *              to express like-strategy: starts with (string%), ends with (%string),
+   *              contains (%string%)
+   * @throws NotValidException if the name or value is null
+   */
+  HistoricCaseInstanceQuery variableValueLike(String name, String value);
 
   /** Order by the case instance id (needs to be followed by {@link #asc()} or {@link #desc()}). */
   HistoricCaseInstanceQuery orderByCaseInstanceId();

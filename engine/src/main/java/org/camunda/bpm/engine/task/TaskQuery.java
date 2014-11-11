@@ -306,7 +306,7 @@ public interface TaskQuery extends Query<TaskQuery, Task>{
   /**
    * Only select tasks which are part of a case instance that have a variable
    * with the given name set to the given value. The type of variable is determined based
-   * on the value, using types configured in {@link ProcessEngineConfiguration#getVariableTypes()}.
+   * on the value, using types configured in {@link ProcessEngineConfiguration#getVariableSerializers()}.
    *
    * Byte-arrays and {@link Serializable} objects (which are not primitive type wrappers)
    * are not supported.
@@ -319,7 +319,7 @@ public interface TaskQuery extends Query<TaskQuery, Task>{
    * Only select tasks which are part of a case instance that have a variable
    * with the given name, but with a different value than the passed value. The
    * type of variable is determined based on the value, using types configured
-   * in {@link ProcessEngineConfiguration#getVariableTypes()}.
+   * in {@link ProcessEngineConfiguration#getVariableSerializers()}.
    *
    * Byte-arrays and {@link Serializable} objects (which are not primitive type wrappers)
    * are not supported.
@@ -508,6 +508,9 @@ public interface TaskQuery extends Query<TaskQuery, Task>{
 
   /** Order by task name (needs to be followed by {@link #asc()} or {@link #desc()}). */
   TaskQuery orderByTaskName();
+
+  /** Order by task name case insensitive (needs to be followed by {@link #asc()} or {@link #desc()}). */
+  TaskQuery orderByTaskNameCaseInsensitive();
 
   /** Order by description (needs to be followed by {@link #asc()} or {@link #desc()}). */
   TaskQuery orderByTaskDescription();

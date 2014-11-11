@@ -12,37 +12,34 @@
  */
 package org.camunda.bpm.engine.rest.sub.task;
 
-import static org.camunda.bpm.engine.rest.hal.Hal.MEDIA_TYPE_HAL;
-
 import java.util.List;
-
+import java.util.Map;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
 
-import org.camunda.bpm.engine.rest.dto.FormVariablesDto;
+import org.camunda.bpm.engine.rest.dto.VariableValueDto;
 import org.camunda.bpm.engine.rest.dto.task.CompleteTaskDto;
 import org.camunda.bpm.engine.rest.dto.task.FormDto;
 import org.camunda.bpm.engine.rest.dto.task.IdentityLinkDto;
 import org.camunda.bpm.engine.rest.dto.task.TaskDto;
 import org.camunda.bpm.engine.rest.dto.task.UserIdDto;
-import org.camunda.bpm.engine.rest.hal.task.HalTask;
+import org.camunda.bpm.engine.rest.hal.Hal;
 import org.camunda.bpm.engine.rest.sub.VariableResource;
 
 public interface TaskResource {
 
   @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  TaskDto getTask();
-
-  @GET
-  @Produces(MEDIA_TYPE_HAL)
-  HalTask getHalTask();
+  @Produces({MediaType.APPLICATION_JSON, Hal.APPLICATION_HAL_JSON})
+  Object getTask(@Context Request request);
 
   @GET
   @Path("/form")
@@ -115,7 +112,8 @@ public interface TaskResource {
   @GET
   @Path("/form-variables")
   @Produces(MediaType.APPLICATION_JSON)
-  FormVariablesDto getFormVariables(@QueryParam("variableNames") String variableNames);
+  Map<String, VariableValueDto> getFormVariables(@QueryParam("variableNames") String variableNames,
+      @QueryParam(VariableResource.DESERIALIZE_VALUE_QUERY_PARAM) @DefaultValue("true") boolean deserializeValues);
 
   @PUT
   @Consumes(MediaType.APPLICATION_JSON)

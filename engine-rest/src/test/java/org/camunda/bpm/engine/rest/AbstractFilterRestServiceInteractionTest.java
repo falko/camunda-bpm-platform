@@ -21,10 +21,10 @@ import static org.camunda.bpm.engine.authorization.Permissions.READ;
 import static org.camunda.bpm.engine.authorization.Permissions.UPDATE;
 import static org.camunda.bpm.engine.authorization.Resources.FILTER;
 import static org.camunda.bpm.engine.rest.helper.MockProvider.EXAMPLE_FILTER_ID;
-import static org.camunda.bpm.engine.rest.helper.MockProvider.STRING_VARIABLE_INSTANCE_TYPE;
 import static org.camunda.bpm.engine.rest.helper.MockProvider.mockFilter;
 import static org.camunda.bpm.engine.rest.helper.MockProvider.mockVariableInstance;
 import static org.camunda.bpm.engine.rest.helper.TaskQueryMatcher.hasName;
+import static org.camunda.bpm.engine.variable.Variables.stringValue;
 import static org.fest.assertions.Assertions.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -64,9 +64,9 @@ import org.camunda.bpm.engine.impl.AuthorizationServiceImpl;
 import org.camunda.bpm.engine.impl.IdentityServiceImpl;
 import org.camunda.bpm.engine.impl.TaskQueryImpl;
 import org.camunda.bpm.engine.impl.identity.Authentication;
+import org.camunda.bpm.engine.impl.persistence.entity.FilterEntity;
 import org.camunda.bpm.engine.impl.persistence.entity.TaskEntity;
 import org.camunda.bpm.engine.query.Query;
-import org.camunda.bpm.engine.rest.dto.runtime.FilterDto;
 import org.camunda.bpm.engine.rest.dto.task.TaskQueryDto;
 import org.camunda.bpm.engine.rest.helper.MockProvider;
 import org.camunda.bpm.engine.rest.helper.MockTaskBuilder;
@@ -74,6 +74,7 @@ import org.camunda.bpm.engine.runtime.VariableInstance;
 import org.camunda.bpm.engine.runtime.VariableInstanceQuery;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.task.TaskQuery;
+import org.camunda.bpm.engine.variable.value.TypedValue;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -183,6 +184,8 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
       .thenReturn(variableInstanceQueryMock);
     when(variableInstanceQueryMock.variableNameIn((String) anyVararg()))
       .thenReturn(variableInstanceQueryMock);
+    when(variableInstanceQueryMock.disableBinaryFetching()).thenReturn(variableInstanceQueryMock);
+    when(variableInstanceQueryMock.disableCustomObjectDeserialization()).thenReturn(variableInstanceQueryMock);
   }
 
   @Test
@@ -211,12 +214,46 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
   }
 
   @Test
+  public void testGetFilterWithCandidateGroupQuery() {
+    TaskQueryImpl query = new TaskQueryImpl();
+    query.taskCandidateGroup("abc");
+    Filter filter = new FilterEntity("Task").setName("test").setQuery(query);
+    when(filterServiceMock.getFilter(EXAMPLE_FILTER_ID)).thenReturn(filter);
+
+    given()
+      .pathParam("id", EXAMPLE_FILTER_ID)
+    .then().expect()
+      .statusCode(Status.OK.getStatusCode())
+      .body("query.candidateGroup", equalTo("abc"))
+      .body("query.containsKey('candidateGroups')", is(false))
+    .when()
+      .get(SINGLE_FILTER_URL);
+  }
+
+  @Test
+  public void testGetFilterWithCandidateUserQuery() {
+    TaskQueryImpl query = new TaskQueryImpl();
+    query.taskCandidateUser("abc");
+    Filter filter = new FilterEntity("Task").setName("test").setQuery(query);
+    when(filterServiceMock.getFilter(EXAMPLE_FILTER_ID)).thenReturn(filter);
+
+    given()
+      .pathParam("id", EXAMPLE_FILTER_ID)
+    .then().expect()
+      .statusCode(Status.OK.getStatusCode())
+      .body("query.candidateUser", equalTo("abc"))
+      .body("query.containsKey('candidateGroups')", is(false))
+  .when()
+      .get(SINGLE_FILTER_URL);
+  }
+
+  @Test
   public void testCreateFilter() {
-    FilterDto dto = FilterDto.fromFilter(MockProvider.createMockFilter());
+    Map<String, Object> json = toFilterRequest(MockProvider.createMockFilter());
 
     given()
       .contentType(POST_JSON_CONTENT_TYPE)
-      .body(dto)
+      .body(json)
     .then().expect()
       .statusCode(Status.OK.getStatusCode())
       .body("id", notNullValue())
@@ -240,12 +277,12 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
 
   @Test
   public void testUpdateFilter() {
-    FilterDto dto = FilterDto.fromFilter(MockProvider.createMockFilter());
+    Map<String, Object> json = toFilterRequest(MockProvider.createMockFilter());
 
     given()
       .pathParam("id", EXAMPLE_FILTER_ID)
       .contentType(POST_JSON_CONTENT_TYPE)
-      .body(dto)
+      .body(json)
     .then().expect()
       .statusCode(Status.NO_CONTENT.getStatusCode())
     .when()
@@ -257,17 +294,32 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
 
   @Test
   public void testInvalidResourceType() {
-    FilterDto dto = FilterDto.fromFilter(MockProvider.createMockFilter());
-    dto.setResourceType("invalid");
+    Map<String, Object> json = toFilterRequest(MockProvider.createMockFilter());
+    json.put("resourceType", "invalid");
 
     given()
       .pathParam("id", EXAMPLE_FILTER_ID)
       .contentType(POST_JSON_CONTENT_TYPE)
-      .body(dto)
+      .body(json)
     .then().expect()
       .statusCode(Status.BAD_REQUEST.getStatusCode())
     .when()
       .put(SINGLE_FILTER_URL);
+  }
+
+  protected Map<String, Object> toFilterRequest(Filter filter) {
+    Map<String, Object> json = new HashMap<String, Object>();
+
+    json.put("id", filter.getId());
+    json.put("name", filter.getName());
+    json.put("owner", filter.getOwner());
+    json.put("properties", filter.getProperties());
+    json.put("resourceType", filter.getResourceType());
+
+    // should not use the dto classes in client-side tests
+    json.put("query", TaskQueryDto.fromQuery(filter.getQuery()));
+
+    return json;
   }
 
   @Test
@@ -525,6 +577,7 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
   @Test
   public void testEmptyHalList() {
     when(filterServiceMock.list(anyString(), any(Query.class))).thenReturn(Collections.emptyList());
+    when(filterServiceMock.count(anyString(), any(Query.class))).thenReturn(0l);
 
     given()
       .header(ACCEPT_HAL_HEADER)
@@ -997,10 +1050,10 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
 
     // mock variable instances
     List<VariableInstance> variableInstances = Arrays.asList(
-      createExecutionVariableInstanceMock("foo", "execution", EXECUTION_B_ID),
-      createExecutionVariableInstanceMock("execution", "bar", EXECUTION_B_ID),
-      createTaskVariableInstanceMock("foo", "task", TASK_B_ID),
-      createTaskVariableInstanceMock("task", "bar", TASK_B_ID)
+      createExecutionVariableInstanceMock("foo", stringValue("execution"), EXECUTION_B_ID),
+      createExecutionVariableInstanceMock("execution", stringValue("bar"), EXECUTION_B_ID),
+      createTaskVariableInstanceMock("foo", stringValue("task"), TASK_B_ID),
+      createTaskVariableInstanceMock("task", stringValue("bar"), TASK_B_ID)
     );
     when(variableInstanceQueryMock.list()).thenReturn(variableInstances);
 
@@ -1033,16 +1086,16 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
 
     // mock variable instances
     List<VariableInstance> variableInstances = Arrays.asList(
-      createProcessInstanceVariableInstanceMock("foo", "processInstance", PROCESS_INSTANCE_A_ID),
-      createProcessInstanceVariableInstanceMock("processInstance", "bar", PROCESS_INSTANCE_A_ID),
-      createExecutionVariableInstanceMock("foo", "execution", EXECUTION_A_ID),
-      createExecutionVariableInstanceMock("execution", "bar", EXECUTION_A_ID),
-      createTaskVariableInstanceMock("foo", "task", TASK_A_ID),
-      createTaskVariableInstanceMock("task", "bar", TASK_A_ID),
-      createCaseInstanceVariableInstanceMock("foo", "caseInstance", CASE_INSTANCE_A_ID),
-      createCaseInstanceVariableInstanceMock("caseInstance", "bar", CASE_INSTANCE_A_ID),
-      createCaseExecutionVariableInstanceMock("foo", "caseExecution", CASE_EXECUTION_A_ID),
-      createCaseExecutionVariableInstanceMock("caseExecution", "bar", CASE_EXECUTION_A_ID)
+      createProcessInstanceVariableInstanceMock("foo", stringValue("processInstance"), PROCESS_INSTANCE_A_ID),
+      createProcessInstanceVariableInstanceMock("processInstance", stringValue("bar"), PROCESS_INSTANCE_A_ID),
+      createExecutionVariableInstanceMock("foo", stringValue("execution"), EXECUTION_A_ID),
+      createExecutionVariableInstanceMock("execution", stringValue("bar"), EXECUTION_A_ID),
+      createTaskVariableInstanceMock("foo", stringValue("task"), TASK_A_ID),
+      createTaskVariableInstanceMock("task", stringValue("bar"), TASK_A_ID),
+      createCaseInstanceVariableInstanceMock("foo", stringValue("caseInstance"), CASE_INSTANCE_A_ID),
+      createCaseInstanceVariableInstanceMock("caseInstance", stringValue("bar"), CASE_INSTANCE_A_ID),
+      createCaseExecutionVariableInstanceMock("foo", stringValue("caseExecution"), CASE_EXECUTION_A_ID),
+      createCaseExecutionVariableInstanceMock("caseExecution", stringValue("bar"), CASE_EXECUTION_A_ID)
     );
     when(variableInstanceQueryMock.list()).thenReturn(variableInstances);
 
@@ -1062,6 +1115,8 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
     verify(variableInstanceQueryMock, times(1)).variableNameIn((String) anyVararg());
     verify(variableInstanceQueryMock).variableNameIn("foo", "bar");
     verify(variableInstanceQueryMock, times(1)).list();
+    verify(variableInstanceQueryMock, times(1)).disableBinaryFetching();
+    verify(variableInstanceQueryMock, times(1)).disableCustomObjectDeserialization();
 
     String content = response.asString();
     List<Map<String, Object>> variables = from(content).getJsonObject("_embedded.variable");
@@ -1095,22 +1150,22 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
 
     // mock variable instances
     List<VariableInstance> variableInstances = Arrays.asList(
-      createProcessInstanceVariableInstanceMock("foo", PROCESS_INSTANCE_A_ID, PROCESS_INSTANCE_A_ID),
-      createProcessInstanceVariableInstanceMock(PROCESS_INSTANCE_A_ID, "bar", PROCESS_INSTANCE_A_ID),
-      createExecutionVariableInstanceMock("foo", EXECUTION_A_ID, EXECUTION_A_ID),
-      createExecutionVariableInstanceMock(EXECUTION_A_ID, "bar", EXECUTION_A_ID),
-      createExecutionVariableInstanceMock("foo", EXECUTION_B_ID, EXECUTION_B_ID),
-      createExecutionVariableInstanceMock(EXECUTION_B_ID, "bar", EXECUTION_B_ID),
-      createTaskVariableInstanceMock("foo", TASK_A_ID, TASK_A_ID),
-      createTaskVariableInstanceMock(TASK_A_ID, "bar", TASK_A_ID),
-      createTaskVariableInstanceMock("foo", TASK_B_ID, TASK_B_ID),
-      createTaskVariableInstanceMock(TASK_B_ID, "bar", TASK_B_ID),
-      createTaskVariableInstanceMock("foo", TASK_C_ID, TASK_C_ID),
-      createTaskVariableInstanceMock(TASK_C_ID, "bar", TASK_C_ID),
-      createCaseInstanceVariableInstanceMock("foo", CASE_INSTANCE_A_ID, CASE_INSTANCE_A_ID),
-      createCaseInstanceVariableInstanceMock(CASE_INSTANCE_A_ID, "bar", CASE_INSTANCE_A_ID),
-      createCaseExecutionVariableInstanceMock("foo", CASE_EXECUTION_A_ID, CASE_EXECUTION_A_ID),
-      createCaseExecutionVariableInstanceMock(CASE_EXECUTION_A_ID, "bar", CASE_EXECUTION_A_ID)
+      createProcessInstanceVariableInstanceMock("foo", stringValue(PROCESS_INSTANCE_A_ID), PROCESS_INSTANCE_A_ID),
+      createProcessInstanceVariableInstanceMock(PROCESS_INSTANCE_A_ID, stringValue("bar"), PROCESS_INSTANCE_A_ID),
+      createExecutionVariableInstanceMock("foo", stringValue(EXECUTION_A_ID), EXECUTION_A_ID),
+      createExecutionVariableInstanceMock(EXECUTION_A_ID, stringValue("bar"), EXECUTION_A_ID),
+      createExecutionVariableInstanceMock("foo", stringValue(EXECUTION_B_ID), EXECUTION_B_ID),
+      createExecutionVariableInstanceMock(EXECUTION_B_ID, stringValue("bar"), EXECUTION_B_ID),
+      createTaskVariableInstanceMock("foo", stringValue(TASK_A_ID), TASK_A_ID),
+      createTaskVariableInstanceMock(TASK_A_ID, stringValue("bar"), TASK_A_ID),
+      createTaskVariableInstanceMock("foo", stringValue(TASK_B_ID), TASK_B_ID),
+      createTaskVariableInstanceMock(TASK_B_ID, stringValue("bar"), TASK_B_ID),
+      createTaskVariableInstanceMock("foo", stringValue(TASK_C_ID), TASK_C_ID),
+      createTaskVariableInstanceMock(TASK_C_ID, stringValue("bar"), TASK_C_ID),
+      createCaseInstanceVariableInstanceMock("foo", stringValue(CASE_INSTANCE_A_ID), CASE_INSTANCE_A_ID),
+      createCaseInstanceVariableInstanceMock(CASE_INSTANCE_A_ID, stringValue("bar"), CASE_INSTANCE_A_ID),
+      createCaseExecutionVariableInstanceMock("foo", stringValue(CASE_EXECUTION_A_ID), CASE_EXECUTION_A_ID),
+      createCaseExecutionVariableInstanceMock(CASE_EXECUTION_A_ID, stringValue("bar"), CASE_EXECUTION_A_ID)
     );
     when(variableInstanceQueryMock.list()).thenReturn(variableInstances);
 
@@ -1175,6 +1230,51 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
 
   }
 
+  @Test
+  public void testHalTaskListCount() {
+    // mock resulting task
+    List<Task> tasks = Arrays.asList(
+      createTaskMock(TASK_A_ID, PROCESS_INSTANCE_A_ID, EXECUTION_A_ID, null, null),
+      createTaskMock(TASK_B_ID, PROCESS_INSTANCE_A_ID, EXECUTION_A_ID, null, null),
+      createTaskMock(TASK_C_ID, PROCESS_INSTANCE_A_ID, EXECUTION_B_ID, null, null)
+    );
+    when(filterServiceMock.list(eq(EXAMPLE_FILTER_ID), any(Query.class))).thenReturn(tasks);
+    when(filterServiceMock.listPage(eq(EXAMPLE_FILTER_ID), any(Query.class), eq(0), eq(2))).thenReturn(tasks.subList(0, 2));
+    when(filterServiceMock.listPage(eq(EXAMPLE_FILTER_ID), any(Query.class), eq(5), eq(2))).thenReturn(Collections.emptyList());
+    when(filterServiceMock.count(eq(EXAMPLE_FILTER_ID), any(Query.class))).thenReturn((long) tasks.size());
+
+    given()
+      .pathParam("id", EXAMPLE_FILTER_ID)
+      .header(ACCEPT_HAL_HEADER)
+    .then().expect()
+      .body("_embedded.task.size", equalTo(3))
+      .body("count", equalTo(3))
+    .when()
+      .get(EXECUTE_LIST_FILTER_URL);
+
+    given()
+      .pathParam("id", EXAMPLE_FILTER_ID)
+      .queryParam("firstResult", 0)
+      .queryParam("maxResults", 2)
+      .header(ACCEPT_HAL_HEADER)
+    .then().expect()
+      .body("_embedded.task.size", equalTo(2))
+      .body("count", equalTo(3))
+    .when()
+      .get(EXECUTE_LIST_FILTER_URL);
+
+    given()
+      .pathParam("id", EXAMPLE_FILTER_ID)
+      .queryParam("firstResult", 5)
+      .queryParam("maxResults", 2)
+      .header(ACCEPT_HAL_HEADER)
+    .then().expect()
+      .body("_embedded.containsKey('task')", is(false))
+      .body("count", equalTo(3))
+    .when()
+      .get(EXECUTE_LIST_FILTER_URL);
+  }
+
   @SuppressWarnings("unchecked")
   protected List<Map<String, Object>> getEmbeddedTaskVariables(Map<String, Object> task) {
     Map<String, Object> embedded = (Map<String, Object>) task.get("_embedded");
@@ -1213,28 +1313,28 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
       .build();
   }
 
-  protected VariableInstance createTaskVariableInstanceMock(String name, Object value, String taskId) {
+  protected VariableInstance createTaskVariableInstanceMock(String name, TypedValue value, String taskId) {
     return createVariableInstanceMock(name, value, taskId, null, null, null, null);
   }
 
-  protected VariableInstance createExecutionVariableInstanceMock(String name, Object value, String executionId) {
+  protected VariableInstance createExecutionVariableInstanceMock(String name, TypedValue value, String executionId) {
     return createVariableInstanceMock(name, value, null, executionId, null, null, null);
   }
 
-  protected VariableInstance createProcessInstanceVariableInstanceMock(String name, Object value, String processInstanceId) {
+  protected VariableInstance createProcessInstanceVariableInstanceMock(String name, TypedValue value, String processInstanceId) {
     return createVariableInstanceMock(name, value, null, processInstanceId, processInstanceId, null, null);
   }
 
-  protected VariableInstance createCaseExecutionVariableInstanceMock(String name, Object value, String caseExecutionId) {
+  protected VariableInstance createCaseExecutionVariableInstanceMock(String name, TypedValue value, String caseExecutionId) {
     return createVariableInstanceMock(name, value, null, null, null, caseExecutionId, null);
   }
 
-  protected VariableInstance createCaseInstanceVariableInstanceMock(String name, Object value, String caseInstanceId) {
+  protected VariableInstance createCaseInstanceVariableInstanceMock(String name, TypedValue value, String caseInstanceId) {
     return createVariableInstanceMock(name, value, null, null, null, caseInstanceId, caseInstanceId);
   }
 
-  protected VariableInstance createVariableInstanceMock(String name, Object value, String taskId, String executionId, String processInstanceId, String caseExecutionId, String caseInstanceId) {
-    return mockVariableInstance().name(name).value(value).taskId(taskId)
+  protected VariableInstance createVariableInstanceMock(String name, TypedValue value, String taskId, String executionId, String processInstanceId, String caseExecutionId, String caseInstanceId) {
+    return mockVariableInstance().name(name).typedValue(value).taskId(taskId)
       .executionId(executionId).processInstanceId(processInstanceId).caseExecutionId(caseExecutionId).caseInstanceId(caseInstanceId)
       .buildEntity();
   }
@@ -1263,9 +1363,8 @@ public abstract class AbstractFilterRestServiceInteractionTest extends AbstractR
   protected void verifyVariableValue(Map<String, Object> variable, String name, String value, String scopeResourcePath, String scopeId, String variablesName) {
     assertThat(variable.get("name")).isEqualTo(name);
     assertThat(variable.get("value")).isEqualTo(value);
-    assertThat(variable.get("type")).isEqualTo(STRING_VARIABLE_INSTANCE_TYPE);
-    assertThat(variable.get("variableType")).isEqualTo(STRING_VARIABLE_INSTANCE_TYPE);
-    assertThat(variable.get("serializationConfig")).isNull();
+    assertThat(variable.get("type")).isEqualTo("String");
+    assertThat(variable.get("valueInfo")).isEqualTo(Collections.emptyMap());
     assertThat(variable.get("_embedded")).isNull();
     Map<String, Map<String, String>> links = (Map<String, Map<String, String>>) variable.get("_links");
     assertThat(links).hasSize(1);

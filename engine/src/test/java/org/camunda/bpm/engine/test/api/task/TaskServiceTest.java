@@ -27,11 +27,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.camunda.bpm.engine.OptimisticLockingException;
-import org.camunda.bpm.engine.ProcessEngineConfiguration;
 import org.camunda.bpm.engine.ProcessEngineException;
 import org.camunda.bpm.engine.TaskAlreadyClaimedException;
-import org.camunda.bpm.engine.delegate.ProcessEngineVariableType;
-import org.camunda.bpm.engine.delegate.SerializedVariableValue;
 import org.camunda.bpm.engine.history.HistoricDetail;
 import org.camunda.bpm.engine.history.HistoricTaskInstance;
 import org.camunda.bpm.engine.identity.Group;
@@ -41,10 +38,10 @@ import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.persistence.entity.HistoricDetailVariableInstanceUpdateEntity;
 import org.camunda.bpm.engine.impl.test.PluggableProcessEngineTestCase;
 import org.camunda.bpm.engine.impl.util.IoUtil;
+import org.camunda.bpm.engine.impl.variable.serializer.JavaObjectSerializer;
 import org.camunda.bpm.engine.runtime.CaseExecution;
 import org.camunda.bpm.engine.runtime.CaseInstance;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
-import org.camunda.bpm.engine.runtime.VariableInstance;
 import org.camunda.bpm.engine.task.Attachment;
 import org.camunda.bpm.engine.task.Comment;
 import org.camunda.bpm.engine.task.DelegationState;
@@ -53,6 +50,8 @@ import org.camunda.bpm.engine.task.IdentityLink;
 import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.test.Deployment;
+import org.camunda.bpm.engine.variable.VariableMap;
+import org.camunda.bpm.engine.variable.Variables;
 
 /**
  * @author Frederik Heremans
@@ -167,7 +166,7 @@ public class TaskServiceTest extends PluggableProcessEngineTestCase {
 
       identityService.setAuthenticatedUserId("johndoe");
       // Fetch the task again and update
-      Comment comment = taskService.addComment(taskId, null, "look at this \n       isn't this great? slkdjf sldkfjs ldkfjs ldkfjs ldkfj sldkfj sldkfj sldkjg laksfg sdfgsd;flgkj ksajdhf skjdfh ksjdhf skjdhf kalskjgh lskh dfialurhg kajsh dfuieqpgkja rzvkfnjviuqerhogiuvysbegkjz lkhf ais liasduh flaisduh ajiasudh vaisudhv nsfd");
+      Comment comment = taskService.createComment(taskId, null, "look at this \n       isn't this great? slkdjf sldkfjs ldkfjs ldkfjs ldkfj sldkfj sldkfj sldkjg laksfg sdfgsd;flgkj ksajdhf skjdfh ksjdhf skjdhf kalskjgh lskh dfialurhg kajsh dfuieqpgkja rzvkfnjviuqerhogiuvysbegkjz lkhf ais liasduh flaisduh ajiasudh vaisudhv nsfd");
       assertNotNull(comment.getId());
       assertEquals("johndoe", comment.getUserId());
       assertEquals(taskId, comment.getTaskId());
@@ -176,8 +175,8 @@ public class TaskServiceTest extends PluggableProcessEngineTestCase {
       assertEquals("look at this \n       isn't this great? slkdjf sldkfjs ldkfjs ldkfjs ldkfj sldkfj sldkfj sldkjg laksfg sdfgsd;flgkj ksajdhf skjdfh ksjdhf skjdhf kalskjgh lskh dfialurhg kajsh dfuieqpgkja rzvkfnjviuqerhogiuvysbegkjz lkhf ais liasduh flaisduh ajiasudh vaisudhv nsfd", comment.getFullMessage());
       assertNotNull(comment.getTime());
 
-      taskService.addComment(taskId, "pid", "one");
-      taskService.addComment(taskId, "pid", "two");
+      taskService.createComment(taskId, "pid", "one");
+      taskService.createComment(taskId, "pid", "two");
 
       Set<String> expectedComments = new HashSet<String>();
       expectedComments.add("one");
@@ -201,7 +200,7 @@ public class TaskServiceTest extends PluggableProcessEngineTestCase {
       Task task = taskService.newTask("testId");
       taskService.saveTask(task);
       try {
-        taskService.addComment(task.getId(), null, null);
+        taskService.createComment(task.getId(), null, null);
         fail("Expected process engine exception");
       }
       catch (ProcessEngineException e) {}
@@ -215,7 +214,7 @@ public class TaskServiceTest extends PluggableProcessEngineTestCase {
     int historyLevel = processEngineConfiguration.getHistoryLevel().getId();
     if (historyLevel> ProcessEngineConfigurationImpl.HISTORYLEVEL_NONE) {
       try {
-        taskService.addComment(null, null, "test");
+        taskService.createComment(null, null, "test");
         fail("Expected process engine exception");
       }
       catch (ProcessEngineException e){}
@@ -1397,7 +1396,7 @@ public class TaskServiceTest extends PluggableProcessEngineTestCase {
       String taskId = task.getId();
 
       // add comment to task
-      Comment comment = taskService.addComment(taskId, null, "look at this \n       isn't this great? slkdjf sldkfjs ldkfjs ldkfjs ldkfj sldkfj sldkfj sldkjg laksfg sdfgsd;flgkj ksajdhf skjdfh ksjdhf skjdhf kalskjgh lskh dfialurhg kajsh dfuieqpgkja rzvkfnjviuqerhogiuvysbegkjz lkhf ais liasduh flaisduh ajiasudh vaisudhv nsfd");
+      Comment comment = taskService.createComment(taskId, null, "look at this \n       isn't this great? slkdjf sldkfjs ldkfjs ldkfjs ldkfj sldkfj sldkfj sldkjg laksfg sdfgsd;flgkj ksajdhf skjdfh ksjdhf skjdhf kalskjgh lskh dfialurhg kajsh dfuieqpgkja rzvkfnjviuqerhogiuvysbegkjz lkhf ais liasduh flaisduh ajiasudh vaisudhv nsfd");
 
       // select task comment for task id and comment id
       comment = taskService.getTaskComment(taskId, comment.getId());
@@ -1609,116 +1608,97 @@ public class TaskServiceTest extends PluggableProcessEngineTestCase {
 
   }
 
-  @Deployment(resources = TWO_TASKS_PROCESS)
-  public void testSetTaskVariableFromSerialized() {
-    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("twoTasksProcess");
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesTyped() {
+    Map<String, Object> vars = new HashMap<String, Object>();
+    vars.put("variable1", "value1");
+    vars.put("variable2", "value2");
 
-    // Fetch first task
-    Task task = taskService.createTaskQuery().singleResult();
-    assertNotNull(task);
-
-    taskService.setVariableFromSerialized(task.getId(), "aVar", "aValue", ProcessEngineVariableType.STRING.getName(), null);
-
-    VariableInstance variableInstance =
-        runtimeService.createVariableInstanceQuery().processInstanceIdIn(processInstance.getId()).singleResult();
-
-    assertNotNull(variableInstance);
-    assertEquals("aVar", variableInstance.getName());
-    assertEquals("aValue", variableInstance.getValue());
-    assertEquals(ProcessEngineVariableType.STRING.getName(), variableInstance.getTypeName());
-
-    SerializedVariableValue serializedValue = variableInstance.getSerializedValue();
-    assertNotNull(serializedValue);
-    assertEquals("aValue", serializedValue.getValue());
-    assertTrue(serializedValue.getConfig().isEmpty());
-
-    variableInstance =
-        runtimeService.createVariableInstanceQuery().taskIdIn(task.getId()).singleResult();
-
-    assertNull(variableInstance);
-
+    runtimeService.startProcessInstanceByKey("oneTaskProcess", vars);
+    String taskId = taskService.createTaskQuery().singleResult().getId();
+    VariableMap variablesTyped = taskService.getVariablesTyped(taskId);
+    assertEquals(vars, variablesTyped);
   }
 
-  @Deployment(resources = TWO_TASKS_PROCESS)
-  public void testSetTaskVariableLocalFromSerialized() {
-    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("twoTasksProcess");
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesTypedDeserialize() {
 
-    // Fetch first task
-    Task task = taskService.createTaskQuery().singleResult();
-    assertNotNull(task);
+    runtimeService.startProcessInstanceByKey("oneTaskProcess",
+        Variables.createVariables()
+          .putValue("broken", Variables.serializedObjectValue("broken")
+              .serializationDataFormat(JavaObjectSerializer.SERIALIZATION_DATA_FORMAT)
+              .objectTypeName("unexisting").create()));
+    String taskId = taskService.createTaskQuery().singleResult().getId();
 
-    taskService.setVariableLocalFromSerialized(task.getId(), "aVar", "aValue", ProcessEngineVariableType.STRING.getName(), null);
+    // this works
+    VariableMap variablesTyped = taskService.getVariablesTyped(taskId, false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
+    variablesTyped = taskService.getVariablesTyped(taskId, Arrays.asList("broken"), false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
 
-    VariableInstance variableInstance =
-        runtimeService.createVariableInstanceQuery().processInstanceIdIn(processInstance.getId()).singleResult();
-
-    assertNotNull(variableInstance);
-
-    variableInstance =
-        runtimeService.createVariableInstanceQuery().taskIdIn(task.getId()).singleResult();
-
-    assertNotNull(variableInstance);
-    assertEquals("aVar", variableInstance.getName());
-    assertEquals("aValue", variableInstance.getValue());
-    assertEquals(ProcessEngineVariableType.STRING.getName(), variableInstance.getTypeName());
-
-    SerializedVariableValue serializedValue = variableInstance.getSerializedValue();
-    assertNotNull(serializedValue);
-    assertEquals("aValue", serializedValue.getValue());
-    assertTrue(serializedValue.getConfig().isEmpty());
-  }
-
-  @Deployment(resources = TWO_TASKS_PROCESS)
-  public void testSetVariableWithNoName() {
-    runtimeService.startProcessInstanceByKey("twoTasksProcess");
-
-    Task task = taskService.createTaskQuery().singleResult();
-
+    // this does not
     try {
-      taskService.setVariableFromSerialized(task.getId(), null, "aValue", ProcessEngineVariableType.STRING.getName(), null);
-      fail("Should not allow to set task variable without name");
-    } catch (ProcessEngineException e) {
-      // expected
+      taskService.getVariablesTyped(taskId);
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
     }
 
+    // this does not
     try {
-      taskService.setVariableLocalFromSerialized(task.getId(), null, "aValue", ProcessEngineVariableType.STRING.getName(), null);
-      fail("Should not allow to set task variable without name");
-    } catch (ProcessEngineException e) {
-      // expected
+      taskService.getVariablesTyped(taskId, Arrays.asList("broken"), true);
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
     }
   }
 
-  @Deployment(resources = TWO_TASKS_PROCESS)
-  public void testSetVariableWithoutTaskId() {
-    runtimeService.startProcessInstanceByKey("twoTasksProcess");
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesLocalTyped() {
+    Map<String, Object> vars = new HashMap<String, Object>();
+    vars.put("variable1", "value1");
+    vars.put("variable2", "value2");
 
-    try {
-      taskService.setVariableFromSerialized(null, "aVar", "aValue", ProcessEngineVariableType.STRING.getName(), null);
-      fail("Should not allow to set variable for null task");
-    } catch (ProcessEngineException e) {
-      // expected
-    }
+    runtimeService.startProcessInstanceByKey("oneTaskProcess");
+    String taskId = taskService.createTaskQuery().singleResult().getId();
+    taskService.setVariablesLocal(taskId, vars);
 
-    try {
-      taskService.setVariableLocalFromSerialized(null, "aVar", "aValue", ProcessEngineVariableType.STRING.getName(), null);
-      fail("Should not allow to set variable for null task");
-    } catch (ProcessEngineException e) {
-      // expected
-    }
+    VariableMap variablesTyped = taskService.getVariablesLocalTyped(taskId);
+    assertEquals(vars, variablesTyped);
   }
 
-  public void testVariableValueFromSerializedForStandaloneTask() {
+  @Deployment(resources={
+  "org/camunda/bpm/engine/test/api/oneTaskProcess.bpmn20.xml"})
+  public void testGetVariablesLocalTypedDeserialize() {
 
-    Task task = taskService.newTask();
-    taskService.saveTask(task);
+    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("oneTaskProcess");
+    String taskId = taskService.createTaskQuery().singleResult().getId();
+    taskService.setVariablesLocal(taskId, Variables.createVariables()
+          .putValue("broken", Variables.serializedObjectValue("broken")
+              .serializationDataFormat(JavaObjectSerializer.SERIALIZATION_DATA_FORMAT)
+              .objectTypeName("unexisting").create()));
 
-    taskService.setVariableFromSerialized(task.getId(), "aVar", "aValue", ProcessEngineVariableType.STRING.getName(), null);
+    // this works
+    VariableMap variablesTyped = taskService.getVariablesLocalTyped(taskId, false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
+    variablesTyped = taskService.getVariablesLocalTyped(taskId, Arrays.asList("broken"), false);
+    assertNotNull(variablesTyped.getValueTyped("broken"));
 
-    String value = (String) taskService.getVariable(task.getId(), "aVar");
-    assertEquals("aValue", value);
+    // this does not
+    try {
+      taskService.getVariablesLocalTyped(taskId);
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
+    }
 
-    taskService.deleteTask(task.getId(), true);
+    // this does not
+    try {
+      taskService.getVariablesLocalTyped(taskId, Arrays.asList("broken"), true);
+    } catch(ProcessEngineException e) {
+      assertTextPresent("Cannot deserialize object", e.getMessage());
+    }
+
   }
 
 }

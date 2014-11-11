@@ -18,7 +18,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
@@ -27,6 +26,8 @@ import org.camunda.bpm.application.ProcessApplicationInfo;
 import org.camunda.bpm.container.RuntimeContainerDelegate;
 import org.camunda.bpm.engine.identity.User;
 import org.camunda.bpm.engine.identity.UserQuery;
+import org.camunda.bpm.engine.repository.CaseDefinition;
+import org.camunda.bpm.engine.repository.CaseDefinitionQuery;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.repository.ProcessDefinitionQuery;
 import org.camunda.bpm.engine.rest.exception.InvalidRequestException;
@@ -83,7 +84,8 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
       .header("accept", MediaType.APPLICATION_JSON)
       .expect().statusCode(Status.BAD_REQUEST.getStatusCode()).contentType(ContentType.JSON)
       .body("type", equalTo(InvalidRequestException.class.getSimpleName()))
-      .body("message", equalTo("Cannot set query parameter 'due' to value 'anInvalidDate'"))
+      .body("message", equalTo("Cannot set query parameter 'due' to value 'anInvalidDate': "
+          + "Cannot convert value \"anInvalidDate\" to java type java.util.Date"))
       .when().get(TASK_QUERY_URL);
   }
 
@@ -176,8 +178,8 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
     List<User> mockUsers = MockProvider.createMockUsers();
     UserQuery sampleUserQuery = mock(UserQuery.class);
     when(sampleUserQuery.listPage(0, 1)).thenReturn(mockUsers);
-    when(sampleUserQuery.userIdIn(new String[] {MockProvider.EXAMPLE_TASK_ASSIGNEE_NAME})).thenReturn(sampleUserQuery);
-    when(sampleUserQuery.userIdIn(new String[] {MockProvider.EXAMPLE_TASK_OWNER})).thenReturn(sampleUserQuery);
+    when(sampleUserQuery.userIdIn(MockProvider.EXAMPLE_TASK_ASSIGNEE_NAME)).thenReturn(sampleUserQuery);
+    when(sampleUserQuery.userIdIn(MockProvider.EXAMPLE_TASK_OWNER)).thenReturn(sampleUserQuery);
     when(sampleUserQuery.count()).thenReturn(1l);
     when(processEngine.getIdentityService().createUserQuery()).thenReturn(sampleUserQuery);
 
@@ -185,9 +187,17 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
     List<ProcessDefinition> mockDefinitions = MockProvider.createMockDefinitions();
     ProcessDefinitionQuery sampleProcessDefinitionQuery = mock(ProcessDefinitionQuery.class);
     when(sampleProcessDefinitionQuery.listPage(0, 1)).thenReturn(mockDefinitions);
-    when(sampleProcessDefinitionQuery.processDefinitionIdIn(new String[] {MockProvider.EXAMPLE_PROCESS_DEFINITION_ID})).thenReturn(sampleProcessDefinitionQuery);
+    when(sampleProcessDefinitionQuery.processDefinitionIdIn(MockProvider.EXAMPLE_PROCESS_DEFINITION_ID)).thenReturn(sampleProcessDefinitionQuery);
     when(sampleProcessDefinitionQuery.count()).thenReturn(1l);
     when(processEngine.getRepositoryService().createProcessDefinitionQuery()).thenReturn(sampleProcessDefinitionQuery);
+
+    // setup case definition query mock
+    List<CaseDefinition> mockCaseDefinitions = MockProvider.createMockCaseDefinitions();
+    CaseDefinitionQuery sampleCaseDefinitionQuery = mock(CaseDefinitionQuery.class);
+    when(sampleCaseDefinitionQuery.listPage(0, 1)).thenReturn(mockCaseDefinitions);
+    when(sampleCaseDefinitionQuery.caseDefinitionIdIn(MockProvider.EXAMPLE_CASE_DEFINITION_ID)).thenReturn(sampleCaseDefinitionQuery);
+    when(sampleCaseDefinitionQuery.count()).thenReturn(1l);
+    when(processEngine.getRepositoryService().createCaseDefinitionQuery()).thenReturn(sampleCaseDefinitionQuery);
 
     // setup example process application context path
     when(processEngine.getManagementService().getProcessApplicationForDeployment(MockProvider.EXAMPLE_DEPLOYMENT_ID))
@@ -203,9 +213,9 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
     RuntimeContainerDelegate.INSTANCE.set(delegate);
 
     Response response = given().queryParam("name", queryName)
-      .header("accept", Hal.MEDIA_TYPE_HAL)
+      .header("accept", Hal.APPLICATION_HAL_JSON)
       .then().expect().statusCode(Status.OK.getStatusCode())
-      .contentType(Hal.MEDIA_TYPE_HAL)
+      .contentType(Hal.APPLICATION_HAL_JSON)
       .when().get(TASK_QUERY_URL);
 
     InOrder inOrder = inOrder(mockQuery);
@@ -222,7 +232,7 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
 
     String returnedTaskName = (String) taskObject.get("name");
     String returnedId = (String) taskObject.get("id");
-    String returendAssignee = (String) taskObject.get("assignee");
+    String returnedAssignee = (String) taskObject.get("assignee");
     String returnedCreateTime = (String) taskObject.get("created");
     String returnedDueDate = (String) taskObject.get("due");
     String returnedFollowUpDate = (String) taskObject.get("followUp");
@@ -243,7 +253,7 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
 
     Assert.assertEquals(MockProvider.EXAMPLE_TASK_NAME, returnedTaskName);
     Assert.assertEquals(MockProvider.EXAMPLE_TASK_ID, returnedId);
-    Assert.assertEquals(MockProvider.EXAMPLE_TASK_ASSIGNEE_NAME, returendAssignee);
+    Assert.assertEquals(MockProvider.EXAMPLE_TASK_ASSIGNEE_NAME, returnedAssignee);
     Assert.assertEquals(MockProvider.EXAMPLE_TASK_CREATE_TIME, returnedCreateTime);
     Assert.assertEquals(MockProvider.EXAMPLE_TASK_DUE_DATE, returnedDueDate);
     Assert.assertEquals(MockProvider.EXAMPLE_FOLLOW_UP_DATE, returnedFollowUpDate);
@@ -306,6 +316,20 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
     Assert.assertEquals(MockProvider.EXAMPLE_PROCESS_DEFINITION_DIAGRAM_RESOURCE_NAME, embeddedProcessDefinition.get("diagram"));
     Assert.assertEquals(MockProvider.EXAMPLE_PROCESS_DEFINITION_IS_SUSPENDED, embeddedProcessDefinition.get("suspended"));
     Assert.assertEquals(MockProvider.EXAMPLE_PROCESS_APPLICATION_CONTEXT_PATH, embeddedProcessDefinition.get("contextPath"));
+
+    // validate embedded caseDefinitions:
+    List<Map<String,Object>> embeddedCaseDefinitions = from(content).getList("_embedded.caseDefinition");
+    Assert.assertEquals("There should be one caseDefinition returned.", 1, embeddedCaseDefinitions.size());
+    Map<String, Object> embeddedCaseDefinition = embeddedCaseDefinitions.get(0);
+    Assert.assertNotNull("The returned caseDefinition should not be null.", embeddedCaseDefinition);
+    Assert.assertEquals(MockProvider.EXAMPLE_CASE_DEFINITION_ID, embeddedCaseDefinition.get("id"));
+    Assert.assertEquals(MockProvider.EXAMPLE_CASE_DEFINITION_KEY, embeddedCaseDefinition.get("key"));
+    Assert.assertEquals(MockProvider.EXAMPLE_CASE_DEFINITION_CATEGORY, embeddedCaseDefinition.get("category"));
+    Assert.assertEquals(MockProvider.EXAMPLE_CASE_DEFINITION_NAME, embeddedCaseDefinition.get("name"));
+    Assert.assertEquals(MockProvider.EXAMPLE_CASE_DEFINITION_VERSION, embeddedCaseDefinition.get("version"));
+    Assert.assertEquals(MockProvider.EXAMPLE_CASE_DEFINITION_RESOURCE_NAME, embeddedCaseDefinition.get("resource"));
+    Assert.assertEquals(MockProvider.EXAMPLE_DEPLOYMENT_ID, embeddedCaseDefinition.get("deploymentId"));
+    Assert.assertEquals(MockProvider.EXAMPLE_PROCESS_APPLICATION_CONTEXT_PATH, embeddedCaseDefinition.get("contextPath"));
   }
 
   @Test
@@ -584,6 +608,11 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
     inOrder.verify(mockQuery).desc();
 
     inOrder = Mockito.inOrder(mockQuery);
+    executeAndVerifySorting("nameCaseInsensitive", "desc", Status.OK);
+    inOrder.verify(mockQuery).orderByTaskNameCaseInsensitive();
+    inOrder.verify(mockQuery).desc();
+
+    inOrder = Mockito.inOrder(mockQuery);
     executeAndVerifySorting("caseInstanceId", "desc", Status.OK);
     inOrder.verify(mockQuery).orderByCaseInstanceId();
     inOrder.verify(mockQuery).desc();
@@ -636,6 +665,11 @@ public abstract class AbstractTaskRestServiceQueryTest extends AbstractRestServi
     inOrder = Mockito.inOrder(mockQuery);
     executeAndVerifySorting("name", "asc", Status.OK);
     inOrder.verify(mockQuery).orderByTaskName();
+    inOrder.verify(mockQuery).asc();
+
+    inOrder = Mockito.inOrder(mockQuery);
+    executeAndVerifySorting("nameCaseInsensitive", "asc", Status.OK);
+    inOrder.verify(mockQuery).orderByTaskNameCaseInsensitive();
     inOrder.verify(mockQuery).asc();
 
     inOrder = Mockito.inOrder(mockQuery);

@@ -17,7 +17,6 @@ import java.util.List;
 
 import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.DelegateTask;
-import org.camunda.bpm.engine.delegate.PersistentVariableInstance;
 import org.camunda.bpm.engine.delegate.VariableScope;
 import org.camunda.bpm.engine.history.IncidentState;
 import org.camunda.bpm.engine.history.UserOperationLogContext;
@@ -141,11 +140,12 @@ public class DefaultHistoryEventProducer implements HistoryEventProducer {
     evt.setVariableInstanceId(variableInstance.getId());
     evt.setProcessInstanceId(variableInstance.getProcessInstanceId());
     evt.setExecutionId(variableInstance.getExecutionId());
+    evt.setCaseInstanceId(variableInstance.getCaseInstanceId());
+    evt.setCaseExecutionId(variableInstance.getCaseExecutionId());
     evt.setTaskId(variableInstance.getTaskId());
     evt.setRevision(variableInstance.getRevision());
     evt.setVariableName(variableInstance.getName());
-    evt.setVariableTypeName(variableInstance.getType().getTypeName());
-    evt.setDataFormatId(variableInstance.getDataFormatId());
+    evt.setSerializerName(variableInstance.getSerializerName());
 
     // copy value
     evt.setTextValue(variableInstance.getTextValue());
@@ -208,7 +208,7 @@ public class DefaultHistoryEventProducer implements HistoryEventProducer {
   }
 
 
-  protected HistoryEvent createHistoricVariableEvent(VariableInstanceEntity variableInstance, VariableScope<PersistentVariableInstance> sourceVariableScope, HistoryEventType eventType) {
+  protected HistoryEvent createHistoricVariableEvent(VariableInstanceEntity variableInstance, VariableScope sourceVariableScope, HistoryEventType eventType) {
     String scopeActivityInstanceId = null;
     String sourceActivityInstanceId = null;
 
@@ -352,7 +352,7 @@ public class DefaultHistoryEventProducer implements HistoryEventProducer {
     HistoricActivityInstanceEventEntity evt = newActivityInstanceEventEntity(executionEntity);
 
     // initialize event
-    initActivityInstanceEvent(evt, (ExecutionEntity) execution, HistoryEventTypes.ACTIVITY_INSTANCE_START);
+    initActivityInstanceEvent(evt, executionEntity, HistoryEventTypes.ACTIVITY_INSTANCE_START);
 
     evt.setStartTime(ClockUtil.getCurrentTime());
 
@@ -473,21 +473,21 @@ public class DefaultHistoryEventProducer implements HistoryEventProducer {
 
   // variables /////////////////////////////////
 
-  public HistoryEvent createHistoricVariableCreateEvt(VariableInstanceEntity variableInstance, VariableScope<PersistentVariableInstance> sourceVariableScope) {
+  public HistoryEvent createHistoricVariableCreateEvt(VariableInstanceEntity variableInstance, VariableScope sourceVariableScope) {
     return createHistoricVariableEvent(variableInstance, sourceVariableScope, HistoryEventTypes.VARIABLE_INSTANCE_CREATE);
   }
 
-  public HistoryEvent createHistoricVariableDeleteEvt(VariableInstanceEntity variableInstance, VariableScope<PersistentVariableInstance> sourceVariableScope) {
-    return createHistoricVariableEvent(variableInstance, sourceVariableScope, HistoryEventTypes.VARIABLE_INSTANCE_DELTE);
+  public HistoryEvent createHistoricVariableDeleteEvt(VariableInstanceEntity variableInstance, VariableScope sourceVariableScope) {
+    return createHistoricVariableEvent(variableInstance, sourceVariableScope, HistoryEventTypes.VARIABLE_INSTANCE_DELETE);
   }
 
-  public HistoryEvent createHistoricVariableUpdateEvt(VariableInstanceEntity variableInstance, VariableScope<PersistentVariableInstance> sourceVariableScope) {
+  public HistoryEvent createHistoricVariableUpdateEvt(VariableInstanceEntity variableInstance, VariableScope sourceVariableScope) {
     return createHistoricVariableEvent(variableInstance, sourceVariableScope, HistoryEventTypes.VARIABLE_INSTANCE_UPDATE);
   }
 
   // form Properties ///////////////////////////
 
-  public HistoryEvent createFormPropertyUpdateEvt(ExecutionEntity execution, String propertyId, Object propertyValue, String taskId) {
+  public HistoryEvent createFormPropertyUpdateEvt(ExecutionEntity execution, String propertyId, String propertyValue, String taskId) {
 
     final IdGenerator idGenerator = Context.getProcessEngineConfiguration().getIdGenerator();
 
@@ -501,7 +501,7 @@ public class DefaultHistoryEventProducer implements HistoryEventProducer {
     historicFormPropertyEntity.setProcessDefinitionId(execution.getProcessDefinitionId());
     historicFormPropertyEntity.setProcessInstanceId(execution.getProcessInstanceId());
     historicFormPropertyEntity.setPropertyId(propertyId);
-    historicFormPropertyEntity.setPropertyValue(propertyValue.toString());
+    historicFormPropertyEntity.setPropertyValue(propertyValue);
     historicFormPropertyEntity.setTaskId(taskId);
 
     return historicFormPropertyEntity;

@@ -50,7 +50,13 @@ public abstract class JobEntity implements Serializable, Job, DbEntity, HasDbRev
 
   public static final boolean DEFAULT_EXCLUSIVE = true;
   public static final int DEFAULT_RETRIES = 3;
-  private static final int MAX_EXCEPTION_MESSAGE_LENGTH = 255;
+
+  /**
+   * Note: {@link String#length()} counts Unicode supplementary
+   * characters twice, so for a String consisting only of those,
+   * the limit is effectively MAX_EXCEPTION_MESSAGE_LENGTH / 2
+   */
+  public static int MAX_EXCEPTION_MESSAGE_LENGTH = 666;
 
   private static final long serialVersionUID = 1L;
 
@@ -154,6 +160,9 @@ public abstract class JobEntity implements Serializable, Job, DbEntity, HasDbRev
     persistentState.put("duedate", duedate);
     persistentState.put("exceptionMessage", exceptionMessage);
     persistentState.put("suspensionState", suspensionState);
+    persistentState.put("processDefinitionId", processDefinitionId);
+    persistentState.put("jobDefinitionId", jobDefinitionId);
+    persistentState.put("deploymentId", deploymentId);
     if(exceptionByteArrayId != null) {
       persistentState.put("exceptionByteArrayId", exceptionByteArrayId);
     }
@@ -185,6 +194,11 @@ public abstract class JobEntity implements Serializable, Job, DbEntity, HasDbRev
   }
 
   public void setRetries(int retries) {
+    // if retries should be set to a negative value set it to 0
+    if (retries < 0) {
+      retries = 0;
+    }
+
     // Assuming: if the number of retries will
     // be changed from 0 to x (x >= 1), means
     // that the corresponding incident is resolved.
@@ -194,7 +208,7 @@ public abstract class JobEntity implements Serializable, Job, DbEntity, HasDbRev
 
     // If the retries will be set to 0, an
     // incident has to be created.
-    if(retries == 0) {
+    if(retries == 0 && this.retries > 0) {
       createFailedJobIncident();
     }
     this.retries = retries;

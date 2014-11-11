@@ -25,6 +25,7 @@ import org.camunda.bpm.engine.rest.GroupRestService;
 import org.camunda.bpm.engine.rest.dto.ResourceOptionsDto;
 import org.camunda.bpm.engine.rest.sub.identity.GroupMembersResource;
 import org.camunda.bpm.engine.rest.util.PathUtil;
+import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * @author Daniel Meyer
@@ -32,8 +33,8 @@ import org.camunda.bpm.engine.rest.util.PathUtil;
  */
 public class GroupMembersResourceImpl extends AbstractIdentityResource implements GroupMembersResource {
 
-  public GroupMembersResourceImpl(String processEngineName, String resourceId, String rootResourcePath) {
-    super(processEngineName, Resources.GROUP_MEMBERSHIP, resourceId);
+  public GroupMembersResourceImpl(String processEngineName, String resourceId, String rootResourcePath, ObjectMapper objectMapper) {
+    super(processEngineName, Resources.GROUP_MEMBERSHIP, resourceId, objectMapper);
     this.relativeRootResourcePath = rootResourcePath;
   }
 
@@ -57,7 +58,7 @@ public class GroupMembersResourceImpl extends AbstractIdentityResource implement
 
     URI uri = context.getBaseUriBuilder()
         .path(relativeRootResourcePath)
-        .path(GroupRestService.class)
+        .path(GroupRestService.PATH)
         .path(resourceId)
         .path(PATH)
         .build();

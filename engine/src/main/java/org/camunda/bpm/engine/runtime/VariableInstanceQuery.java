@@ -63,7 +63,7 @@ public interface VariableInstanceQuery extends Query<VariableInstanceQuery, Vari
   /**
    * Only select variables instances which have the given name and value. The type
    * of variable is determined based on the value, using types configured in
-   * {@link ProcessEngineConfiguration#getVariableTypes()}.
+   * {@link ProcessEngineConfiguration#getVariableSerializers()}.
    * Byte-arrays and {@link Serializable} objects (which are not primitive type wrappers)
    * are not supported.
    * @param name name of the variable, cannot be null.

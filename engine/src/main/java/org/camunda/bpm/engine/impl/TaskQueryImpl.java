@@ -29,7 +29,7 @@ import org.camunda.bpm.engine.impl.interceptor.CommandContext;
 import org.camunda.bpm.engine.impl.interceptor.CommandExecutor;
 import org.camunda.bpm.engine.impl.persistence.entity.SuspensionState;
 import org.camunda.bpm.engine.impl.persistence.entity.TaskEntity;
-import org.camunda.bpm.engine.impl.variable.VariableTypes;
+import org.camunda.bpm.engine.impl.variable.serializer.VariableSerializers;
 import org.camunda.bpm.engine.task.DelegationState;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.task.TaskQuery;
@@ -85,6 +85,7 @@ public class TaskQueryImpl extends AbstractQuery<TaskQuery, Task> implements Tas
   protected boolean excludeSubtasks = false;
   protected SuspensionState suspensionState;
   protected boolean initializeFormKeys = false;
+  protected boolean taskNameCaseInsensitive = false;
 
   // case management /////////////////////////////
   protected String caseDefinitionKey;
@@ -656,6 +657,11 @@ public class TaskQueryImpl extends AbstractQuery<TaskQuery, Task> implements Tas
     return this;
   }
 
+  public TaskQuery taskNameCaseInsensitive() {
+    this.taskNameCaseInsensitive = true;
+    return this;
+  }
+
   public List<String> getCandidateGroups() {
     if (candidateGroup!=null) {
       return Collections.singletonList(candidateGroup);
@@ -684,7 +690,7 @@ public class TaskQueryImpl extends AbstractQuery<TaskQuery, Task> implements Tas
   }
 
   protected void ensureVariablesInitialized() {
-    VariableTypes types = Context.getProcessEngineConfiguration().getVariableTypes();
+    VariableSerializers types = Context.getProcessEngineConfiguration().getVariableSerializers();
     for(QueryVariableValue var : variables) {
       var.initialize(types);
     }
@@ -732,6 +738,11 @@ public class TaskQueryImpl extends AbstractQuery<TaskQuery, Task> implements Tas
 
   public TaskQuery orderByTaskName() {
     return orderBy(TaskQueryProperty.NAME);
+  }
+
+  public TaskQuery orderByTaskNameCaseInsensitive() {
+    taskNameCaseInsensitive();
+    return orderBy(TaskQueryProperty.NAME_CASE_INSENSITIVE);
   }
 
   public TaskQuery orderByTaskDescription() {
@@ -1010,6 +1021,10 @@ public class TaskQueryImpl extends AbstractQuery<TaskQuery, Task> implements Tas
 
   public boolean isInitializeFormKeys() {
     return initializeFormKeys;
+  }
+
+  public boolean isTaskNameCaseInsensitive() {
+    return taskNameCaseInsensitive;
   }
 
   public TaskQuery extend(TaskQuery extending) {
@@ -1344,6 +1359,10 @@ public class TaskQueryImpl extends AbstractQuery<TaskQuery, Task> implements Tas
 
     if (extendingQuery.isInitializeFormKeys() || this.isInitializeFormKeys()) {
       extendedQuery.initializeFormKeys();
+    }
+
+    if (extendingQuery.isTaskNameCaseInsensitive() || this.isTaskNameCaseInsensitive()) {
+      extendedQuery.taskNameCaseInsensitive();
     }
 
     // merge variables

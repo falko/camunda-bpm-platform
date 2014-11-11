@@ -12,9 +12,13 @@
  */
 package org.camunda.bpm.engine.impl.history;
 
-import org.camunda.bpm.engine.impl.history.event.HistoryEventType;
+import static org.camunda.bpm.engine.impl.history.event.HistoryEventTypes.FORM_PROPERTY_UPDATE;
+import static org.camunda.bpm.engine.impl.history.event.HistoryEventTypes.VARIABLE_INSTANCE_CREATE;
+import static org.camunda.bpm.engine.impl.history.event.HistoryEventTypes.VARIABLE_INSTANCE_DELETE;
+import static org.camunda.bpm.engine.impl.history.event.HistoryEventTypes.VARIABLE_INSTANCE_UPDATE;
 
-import static org.camunda.bpm.engine.impl.history.event.HistoryEventTypes.*;
+import org.camunda.bpm.engine.ProcessEngineConfiguration;
+import org.camunda.bpm.engine.impl.history.event.HistoryEventType;
 
 /**
  * @author Daniel Meyer
@@ -27,7 +31,7 @@ public class HistoryLevelAudit extends HistoryLevelActivity {
   }
 
   public String getName() {
-    return "audit";
+    return ProcessEngineConfiguration.HISTORY_AUDIT;
   }
 
   @Override
@@ -35,7 +39,7 @@ public class HistoryLevelAudit extends HistoryLevelActivity {
     return super.isHistoryEventProduced(eventType, entity)
         || VARIABLE_INSTANCE_CREATE == eventType
         || VARIABLE_INSTANCE_UPDATE == eventType
-        || VARIABLE_INSTANCE_DELTE == eventType
+        || VARIABLE_INSTANCE_DELETE == eventType
 
         || FORM_PROPERTY_UPDATE == eventType
       ;

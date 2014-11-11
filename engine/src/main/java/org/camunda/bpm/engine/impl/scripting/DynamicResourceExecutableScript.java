@@ -27,18 +27,17 @@ import org.camunda.bpm.engine.impl.util.ResourceUtil;
  */
 public class DynamicResourceExecutableScript extends DynamicExecutableScript {
 
-  public DynamicResourceExecutableScript(Expression scriptResourceExpression, String language) {
+  public DynamicResourceExecutableScript(String language, Expression scriptResourceExpression) {
     super(scriptResourceExpression, language);
   }
 
-  public ExecutableScript getScript(VariableScope<?> variableScope) {
-    String scriptPath = (String) scriptExpression.getValue(variableScope);
-    String scriptSource = ResourceUtil.loadResourceContent(scriptPath, getDeployment());
-    return compileScript(scriptSource);
+  public String getScriptSource(VariableScope variableScope) {
+    String scriptPath = evaluateExpression(variableScope);
+    return ResourceUtil.loadResourceContent(scriptPath, getDeployment());
   }
 
   protected DeploymentEntity getDeployment() {
-    return Context.getExecutionContext().getDeployment();
+    return Context.getBpmnExecutionContext().getDeployment();
   }
 
 }

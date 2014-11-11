@@ -14,38 +14,55 @@ package org.camunda.bpm.engine.rest.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import javax.ws.rs.core.Variant;
+
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.rest.TaskRestService;
 import org.camunda.bpm.engine.rest.dto.CountResultDto;
 import org.camunda.bpm.engine.rest.dto.task.TaskDto;
 import org.camunda.bpm.engine.rest.dto.task.TaskQueryDto;
+import org.camunda.bpm.engine.rest.exception.InvalidRequestException;
+import org.camunda.bpm.engine.rest.hal.Hal;
 import org.camunda.bpm.engine.rest.hal.task.HalTaskList;
 import org.camunda.bpm.engine.rest.sub.task.TaskResource;
 import org.camunda.bpm.engine.rest.sub.task.impl.TaskResourceImpl;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.task.TaskQuery;
+import org.codehaus.jackson.map.ObjectMapper;
 
 public class TaskRestServiceImpl extends AbstractRestProcessEngineAware implements TaskRestService {
 
-  public TaskRestServiceImpl() {
-    super();
+  public static final List<Variant> VARIANTS = Variant.mediaTypes(MediaType.APPLICATION_JSON_TYPE, Hal.APPLICATION_HAL_JSON_TYPE).add().build();
+
+  public TaskRestServiceImpl(String engineName, final ObjectMapper objectMapper) {
+    super(engineName, objectMapper);
   }
 
-  public TaskRestServiceImpl(String engineName) {
-    super(engineName);
+  public Object getTasks(Request request, UriInfo uriInfo, Integer firstResult, Integer maxResults) {
+    Variant variant = request.selectVariant(VARIANTS);
+    if (variant != null) {
+      if (MediaType.APPLICATION_JSON_TYPE.equals(variant.getMediaType())) {
+        return getJsonTasks(uriInfo, firstResult, maxResults);
+      }
+      else if (Hal.APPLICATION_HAL_JSON_TYPE.equals(variant.getMediaType())) {
+        return getHalTasks(uriInfo, firstResult, maxResults);
+      }
+    }
+    throw new InvalidRequestException(Response.Status.NOT_ACCEPTABLE, "No acceptable content-type found");
   }
 
-  @Override
-  public List<TaskDto> getTasks(UriInfo uriInfo, Integer firstResult, Integer maxResults) {
-    TaskQueryDto queryDto = new TaskQueryDto(uriInfo.getQueryParameters());
+  public List<TaskDto> getJsonTasks(UriInfo uriInfo, Integer firstResult, Integer maxResults) {
+    TaskQueryDto queryDto = new TaskQueryDto(getObjectMapper(), uriInfo.getQueryParameters());
     return queryTasks(queryDto, firstResult, maxResults);
   }
 
-  @Override
   public HalTaskList getHalTasks(UriInfo uriInfo, Integer firstResult, Integer maxResults) {
-    TaskQueryDto queryDto = new TaskQueryDto(uriInfo.getQueryParameters());
+    TaskQueryDto queryDto = new TaskQueryDto(getObjectMapper(), uriInfo.getQueryParameters());
 
     ProcessEngine engine = getProcessEngine();
     TaskQuery query = queryDto.toQuery(engine);
@@ -63,6 +80,7 @@ public class TaskRestServiceImpl extends AbstractRestProcessEngineAware implemen
   public List<TaskDto> queryTasks(TaskQueryDto queryDto, Integer firstResult,
       Integer maxResults) {
     ProcessEngine engine = getProcessEngine();
+    queryDto.setObjectMapper(getObjectMapper());
     TaskQuery query = queryDto.toQuery(engine);
 
     List<Task> matchingTasks = executeTaskQuery(firstResult, maxResults, query);
@@ -102,13 +120,14 @@ public class TaskRestServiceImpl extends AbstractRestProcessEngineAware implemen
 
   @Override
   public CountResultDto getTasksCount(UriInfo uriInfo) {
-    TaskQueryDto queryDto = new TaskQueryDto(uriInfo.getQueryParameters());
+    TaskQueryDto queryDto = new TaskQueryDto(getObjectMapper(), uriInfo.getQueryParameters());
     return queryTasksCount(queryDto);
   }
 
   @Override
   public CountResultDto queryTasksCount(TaskQueryDto queryDto) {
     ProcessEngine engine = getProcessEngine();
+    queryDto.setObjectMapper(getObjectMapper());
     TaskQuery query = queryDto.toQuery(engine);
 
     long count = query.count();
@@ -120,7 +139,7 @@ public class TaskRestServiceImpl extends AbstractRestProcessEngineAware implemen
 
   @Override
   public TaskResource getTask(String id) {
-    return new TaskResourceImpl(getProcessEngine(), id, relativeRootResourcePath);
+    return new TaskResourceImpl(getProcessEngine(), id, relativeRootResourcePath, getObjectMapper());
   }
 
   public void createTask(TaskDto taskDto) {
