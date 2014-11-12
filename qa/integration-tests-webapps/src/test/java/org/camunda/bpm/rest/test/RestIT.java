@@ -1,6 +1,7 @@
 package org.camunda.bpm.rest.test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,7 +73,7 @@ public class RestIT extends AbstractWebappIntegrationTest {
 
     assertEquals("invoice", definitionJson.getString("key"));
     assertEquals("http://www.omg.org/spec/BPMN/20100524/MODEL", definitionJson.getString("category"));
-    assertEquals("invoice receipt", definitionJson.getString("name"));
+    assertEquals("Invoice Receipt", definitionJson.getString("name"));
     Assert.assertTrue(definitionJson.isNull("description"));
     Assert.assertTrue(definitionJson.getString("resource").contains("invoice.bpmn"));
     Assert.assertFalse(definitionJson.getBoolean("suspended"));
@@ -92,7 +93,7 @@ public class RestIT extends AbstractWebappIntegrationTest {
     assertEquals(200, response.getStatus());
 
     JSONArray definitionsJson = response.getEntity(JSONArray.class);
-    assertEquals(1, definitionsJson.length());
+    assertEquals(3, definitionsJson.length());
 
     response.close();
   }
@@ -201,8 +202,8 @@ public class RestIT extends AbstractWebappIntegrationTest {
   protected void assertMediaType(ClientResponse response, MediaType expected) {
     MediaType actual = response.getType();
     assertEquals(200, response.getStatus());
-    // use startsWith cause sometimes server also returns quality parameters
-    assertEquals(expected, actual);
+    // use startsWith cause sometimes server also returns quality parameters (e.g. websphere/wink)
+    assertTrue("Expected: " + expected + " Actual: " + actual, actual.toString().startsWith(expected.toString()));
   }
 
 }
