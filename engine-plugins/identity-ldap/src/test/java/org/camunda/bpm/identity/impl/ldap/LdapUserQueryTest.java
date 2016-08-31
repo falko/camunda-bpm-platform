@@ -118,13 +118,13 @@ public class LdapUserQueryTest extends LdapIdentityProviderTest {
   }
 
   public void testFilterByGroupId() {
-    List<User> result = identityService.createUserQuery().memberOfGroup("development").list();
+    List<User> result = identityService.createUserQuery().memberOfGroup("camunda:matrix:office-*:development").list();
     assertEquals(3, result.size());
   }
 
   public void testFilterByGroupIdAndFirstname() {
     List<User> result = identityService.createUserQuery()
-        .memberOfGroup("development")
+        .memberOfGroup("camunda:matrix:*:development")
         .userFirstName("Oscar")
         .list();
     assertEquals(1, result.size());
@@ -132,7 +132,7 @@ public class LdapUserQueryTest extends LdapIdentityProviderTest {
 
   public void testFilterByGroupIdAndId() {
     List<User> result = identityService.createUserQuery()
-        .memberOfGroup("development")
+        .memberOfGroup("camunda:matrix:*:development")
         .userId("oscar")
         .list();
     assertEquals(1, result.size());
@@ -140,7 +140,7 @@ public class LdapUserQueryTest extends LdapIdentityProviderTest {
 
   public void testFilterByGroupIdAndLastname() {
     List<User> result = identityService.createUserQuery()
-        .memberOfGroup("development")
+        .memberOfGroup("camunda:matrix:*:development")
         .userLastName("The Crouch")
         .list();
     assertEquals(1, result.size());
@@ -148,7 +148,7 @@ public class LdapUserQueryTest extends LdapIdentityProviderTest {
 
   public void testFilterByGroupIdAndEmail() {
     List<User> result = identityService.createUserQuery()
-        .memberOfGroup("development")
+        .memberOfGroup("camunda:matrix:*:development")
         .userEmail("oscar@camunda.org")
         .list();
     assertEquals(1, result.size());
@@ -156,7 +156,7 @@ public class LdapUserQueryTest extends LdapIdentityProviderTest {
 
   public void testFilterByGroupIdAndEmailLike() {
     List<User> result = identityService.createUserQuery()
-        .memberOfGroup("development")
+        .memberOfGroup("camunda:matrix:*:development")
         .userEmailLike("*@camunda.org")
         .list();
     assertEquals(3, result.size());
@@ -164,7 +164,7 @@ public class LdapUserQueryTest extends LdapIdentityProviderTest {
 
   public void testFilterByGroupIdAndIdForDnUsingCn() {
     List<User> result = identityService.createUserQuery()
-        .memberOfGroup("external")
+        .memberOfGroup("camunda:matrix:*:external")
         .userId("fozzie")
         .list();
     assertEquals(1, result.size());

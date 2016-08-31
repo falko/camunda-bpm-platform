@@ -197,45 +197,45 @@ public class LdapTestEnvironment {
     startServer();
 
     createGroup("office-berlin");
-    String dnRoman = createUserUid("roman", "office-berlin", "Roman", "Smirnov", "roman@camunda.org");
-    String dnRobert = createUserUid("robert", "office-berlin", "Robert", "Gimbel", "robert@camunda.org");
-    String dnDaniel = createUserUid("daniel", "office-berlin", "Daniel", "Meyer", "daniel@camunda.org");
+    String dnRoman = createUserUid("roman", "office-berlin", "Roman", "Smirnov", "roman@camunda.org", "development");
+    String dnRobert = createUserUid("robert", "office-berlin", "Robert", "Gimbel", "robert@camunda.org", "management");
+    String dnDaniel = createUserUid("daniel", "office-berlin", "Daniel", "Meyer", "daniel@camunda.org", "management", "development");
 
     createGroup("office-london");
-    String dnOscar = createUserUid("oscar", "office-london", "Oscar", "The Crouch", "oscar@camunda.org");
-    String dnMonster = createUserUid("monster", "office-london", "Cookie", "Monster", "monster@camunda.org");
+    String dnOscar = createUserUid("oscar", "office-london", "Oscar", "The Crouch", "oscar@camunda.org", "development");
+    String dnMonster = createUserUid("monster", "office-london", "Cookie", "Monster", "monster@camunda.org", "sales");
 
     createGroup("office-home");
     // Doesn't work using backslashes, end up with two uid attributes
     // See https://issues.apache.org/jira/browse/DIRSERVER-1442
-    String dnDavid = createUserUid("david(IT)", "office-home", "David", "Howe\\IT\\", "david@camunda.org");
+    String dnDavid = createUserUid("david(IT)", "office-home", "David", "Howe\\IT\\", "david@camunda.org", "sales");
 
-    String dnRuecker = createUserUid("ruecker", "office-home", "Bernd", "Ruecker", "ruecker@camunda.org");
+    String dnRuecker = createUserUid("ruecker", "office-home", "Bernd", "Ruecker", "ruecker@camunda.org", "management", "consulting", "sales");
 
     createGroup("office-external");
-    String dnFozzie = createUserCN("fozzie", "office-external", "Bear", "Fozzie", "fozzie@camunda.org");
+    String dnFozzie = createUserCN("fozzie", "office-external", "Bear", "Fozzie", "fozzie@camunda.org", "external");
 
-    createRole("management", dnRuecker, dnRobert, dnDaniel);
-    createRole("development", dnRoman, dnDaniel, dnOscar);
-    createRole("consulting", dnRuecker);
-    createRole("sales", dnRuecker, dnMonster, dnDavid);
-    createRole("external", dnFozzie);
+//    createRole("management", dnRuecker, dnRobert, dnDaniel);
+//    createRole("development", dnRoman, dnDaniel, dnOscar);
+//    createRole("consulting", dnRuecker);
+//    createRole("sales", dnRuecker, dnMonster, dnDavid);
+//    createRole("external", dnFozzie);
   }
 
-  protected String createUserUid(String user, String group, String firstname, String lastname, String email) throws Exception {
+  protected String createUserUid(String user, String group, String firstname, String lastname, String email, String... roles) throws Exception {
     Dn dn = new Dn("uid=" + user + ",ou=" + group + ",o=camunda,c=org");
-    createUser(user, firstname, lastname, email, dn);
+    createUser(user, firstname, lastname, email, dn, group, roles);
     return dn.getNormName();
   }
 
-  protected String createUserCN(String user, String group, String firstname, String lastname, String email) throws Exception {
+  protected String createUserCN(String user, String group, String firstname, String lastname, String email, String... roles) throws Exception {
     Dn dn = new Dn("cn=" + lastname + "\\," + firstname + ",ou=" + group + ",o=camunda,c=org");
-    createUser(user, firstname, lastname, email, dn);
+    createUser(user, firstname, lastname, email, dn, group, roles);
     return dn.getNormName();
   }
 
   protected void createUser(String user, String firstname, String lastname,
-          String email, Dn dn) throws Exception, NamingException,
+          String email, Dn dn, String group, String... roles) throws Exception, NamingException,
           UnsupportedEncodingException {
     if (!service.getAdminSession().exists(dn)) {
       Entry entry = service.newEntry(dn);
@@ -243,8 +243,11 @@ public class LdapTestEnvironment {
       entry.add("uid", user);
       entry.add("cn", firstname);
       entry.add("sn", lastname);
-      entry.add("mail", email);
+//      entry.add("mail", email);
       entry.add("userPassword", user.getBytes("UTF-8"));
+      for (String role : roles) {
+        entry.add("mail", "camunda:matrix:" + group + ":" + role);
+      }
       service.getAdminSession().add(entry);
       System.out.println("created entry: " + dn.getNormName());
     }

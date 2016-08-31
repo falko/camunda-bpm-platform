@@ -12,13 +12,13 @@
  */
 package org.camunda.bpm.identity.impl.ldap;
 
-import static org.camunda.bpm.engine.authorization.Permissions.READ;
-import static org.camunda.bpm.engine.authorization.Resources.GROUP;
-import static org.camunda.bpm.engine.authorization.Resources.USER;
+import static org.camunda.bpm.engine.authorization.Permissions.*;
+import static org.camunda.bpm.engine.authorization.Resources.*;
 
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -152,13 +152,13 @@ public class LdapIdentityProviderSession implements ReadOnlyIdentityProvider {
 
   public List<User> findUserByQueryCriteria(LdapUserQueryImpl query) {
     ensureContextInitialized();
-    if(query.getGroupId() != null) {
+//    if(query.getGroupId() != null) {
       // if restriction on groupId is provided, we need to search in group tree first, look for the group and then further restrict on the members
-      return findUsersByGroupId(query);
-    } else {
+//      return findUsersByGroupId(query);
+//    } else {
       String userBaseDn = composeDn(ldapConfiguration.getUserSearchBase(), ldapConfiguration.getBaseDn());
       return findUsersWithoutGroupId(query, userBaseDn);
-    }
+//    }
   }
 
   protected List<User> findUsersByGroupId(LdapUserQueryImpl query) {
@@ -327,6 +327,9 @@ public class LdapIdentityProviderSession implements ReadOnlyIdentityProvider {
     if(query.getEmail() != null) {
       addFilter(ldapConfiguration.getUserEmailAttribute(), query.getEmail(), search);
     }
+    if(query.getGroupId() != null) {
+      addFilter(ldapConfiguration.getUserEmailAttribute(), query.getGroupId(), search);
+    }
     if(query.getEmailLike() != null) {
       addFilter(ldapConfiguration.getUserEmailAttribute(), query.getEmailLike(), search);
     }
@@ -372,51 +375,75 @@ public class LdapIdentityProviderSession implements ReadOnlyIdentityProvider {
   public List<Group> findGroupByQueryCriteria(LdapGroupQuery query) {
     ensureContextInitialized();
 
-    String groupBaseDn = composeDn(ldapConfiguration.getGroupSearchBase(),ldapConfiguration.getBaseDn());
-
-    if(ldapConfiguration.isSortControlSupported()) {
-      applyRequestControls(query);
-    }
-
-    NamingEnumeration<SearchResult> enumeration = null;
+    List<Group> groupList = new ArrayList<Group>();
     try {
 
-      String filter = getGroupSearchFilter(query);
-      enumeration = initialContext.search(groupBaseDn, filter, ldapConfiguration.getSearchControls());
+      LdapUserQueryImpl userQuery = new LdapUserQueryImpl();
+      userQuery.userId(query.getUserId());
+      String userBaseDn = composeDn(ldapConfiguration.getUserSearchBase(), ldapConfiguration.getBaseDn());
+      String filter = getUserSearchFilter(userQuery);
+      NamingEnumeration<SearchResult> enumeration = null;
+      enumeration = initialContext.search(userBaseDn, filter, ldapConfiguration.getSearchControls());
 
-      // perform client-side paging
-      int resultCount = 0;
-      List<Group> groupList = new ArrayList<Group>();
-      while (enumeration.hasMoreElements() && groupList.size() < query.getMaxResults()) {
+      if (enumeration.hasMoreElements()) {
         SearchResult result = enumeration.nextElement();
-
-        GroupEntity group = transformGroup(result);
-
-        if(isAuthorized(READ, GROUP, group.getId())) {
-
-          if(resultCount >= query.getFirstResult()) {
-            groupList.add(group);
-          }
-
-          resultCount ++;
+        NamingEnumeration<?> roles = result.getAttributes().get("mail").getAll();
+        while (roles.hasMoreElements()) {
+          String role = (String) roles.nextElement();
+          groupList.add(new GroupEntity(role));
         }
-
+      } else {
+//        throw new IdentityProviderException("User '" + query.getUserId() + "' not found");
       }
+    } catch (NamingException e) {
+      throw new IdentityProviderException("Could not query for users", e);
+    }
+//        
+//    
+//    String groupBaseDn = composeDn(ldapConfiguration.getGroupSearchBase(),ldapConfiguration.getBaseDn());
+//
+//    if(ldapConfiguration.isSortControlSupported()) {
+//      applyRequestControls(query);
+//    }
+//
+//    NamingEnumeration<SearchResult> enumeration = null;
+//    try {
+//
+//      String filter = getGroupSearchFilter(query);
+//      enumeration = initialContext.search(groupBaseDn, filter, ldapConfiguration.getSearchControls());
+//
+//      // perform client-side paging
+//      int resultCount = 0;
+//      while (enumeration.hasMoreElements() && groupList.size() < query.getMaxResults()) {
+//        SearchResult result = enumeration.nextElement();
+//
+//        GroupEntity group = transformGroup(result);
+//
+//        if(isAuthorized(READ, GROUP, group.getId())) {
+//
+//          if(resultCount >= query.getFirstResult()) {
+//            groupList.add(group);
+//          }
+//
+//          resultCount ++;
+//        }
+//
+//      }
 
       return groupList;
 
-    } catch (NamingException e) {
-      throw new IdentityProviderException("Could not query for users", e);
-
-    } finally {
-      try {
-        if (enumeration != null) {
-          enumeration.close();
-        }
-      } catch (Exception e) {
-        // ignore silently
-      }
-    }
+//    } catch (NamingException e) {
+//      throw new IdentityProviderException("Could not query for users", e);
+//
+//    } finally {
+//      try {
+//        if (enumeration != null) {
+//          enumeration.close();
+//        }
+//      } catch (Exception e) {
+//        // ignore silently
+//      }
+//    }
   }
 
   protected String getGroupSearchFilter(LdapGroupQuery query) {
