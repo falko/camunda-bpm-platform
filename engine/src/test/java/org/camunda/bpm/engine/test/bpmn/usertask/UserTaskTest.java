@@ -132,4 +132,12 @@ public class UserTaskTest extends PluggableProcessEngineTestCase {
 
     assertProcessEnded(processInstance.getId());
   }
+  
+  @Deployment
+  public void testAssigneeEqualsCandidateUser() {
+    processEngineConfiguration.setAuthorizationEnabled(true);
+    ProcessInstance processInstance = runtimeService.startProcessInstanceByKey("oneTaskProcess");
+    assertEquals(1, taskService.createTaskQuery().processInstanceId(processInstance.getId()).list().size());
+    processEngineConfiguration.setAuthorizationEnabled(false);
+  }
 }
